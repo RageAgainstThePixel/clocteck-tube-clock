@@ -201,7 +201,6 @@ export interface DisplayFlags {
   transition?: string;
   fade?: string;
   tubeBrightness?: string;
-  night?: string;
 }
 
 /** What `display` was asked to change (HOST-CLI-028); empty means it only prints the options. */
@@ -216,7 +215,6 @@ export function displayChange(flags: DisplayFlags): DisplayChange {
   if (flags.transition !== undefined) change.transition = flags.transition;
   if (flags.fade !== undefined) change.fadeMs = numeric(flags.fade) as number;
   if (flags.tubeBrightness !== undefined) change.tubeBrightness = flags.tubeBrightness.split(',').map((v) => numeric(v) as number);
-  if (flags.night !== undefined) change.night = flags.night;
   return change;
 }
 

@@ -115,7 +115,6 @@ const OPTIONS = {
     transition: { type: 'string' },
     fade: { type: 'string' },
     'tube-brightness': { type: 'string' },
-    night: { type: 'string' },
     help: { type: 'boolean', short: 'h', default: false },
   },
 } as const;
@@ -443,7 +442,6 @@ async function runDisplay(clock: TubeClockClient) {
     transition: values.transition,
     fade: values.fade,
     tubeBrightness: values['tube-brightness'],
-    night: values.night,
   });
   const options = Object.keys(change).length ? await clock.setDisplay(change) : await clock.getDisplay();
   print(options, describeDisplay(options));

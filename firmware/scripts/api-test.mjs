@@ -469,7 +469,7 @@ for (const transition of ['scramble', 'carry']) {
 await req('POST', '/api/display?transition=crossfade');
 r = await req('POST', '/api/display?tubeBrightness=100,90,0,55,100,7');
 check('FW-FX-034 FW-FX-068 tubeBrightness round trip', r.status === 200 && JSON.stringify(r.json?.tubeBrightness) === '[100,90,0,55,100,7]' && r.json.fadeMs === 300, r.text);
-for (const bad of ['fadeMs=20', 'fadeMs=1001', 'fadeMs=x', 'transition=bounce', 'leadingZero=2', 'seconds=yes', 'night=off', 'tubeBrightness=1,2,3,4,5', 'tubeBrightness=1,2,3,4,5,101', 'tubeBrightness=a,b,c,d,e,f']) {
+for (const bad of ['fadeMs=20', 'fadeMs=1001', 'fadeMs=x', 'transition=bounce', 'leadingZero=2', 'seconds=yes', 'tubeBrightness=1,2,3,4,5', 'tubeBrightness=1,2,3,4,5,101', 'tubeBrightness=a,b,c,d,e,f']) {
   r = await req('POST', `/api/display?${bad}`);
   check(`FW-FX-068 FW-API-002 ${bad} is 400`, r.status === 400 && typeof r.json?.error === 'string', `${r.status} ${r.text}`);
 }

@@ -1,6 +1,6 @@
 # Open questions (`OQ`)
 
-Undecided points, and the record of how each was decided. A decided question keeps its ID; the affected requirements carry the decision. Only OQ-02 (hardware measurements) is still open.
+Undecided points, and the record of how each was decided. A decided question keeps its ID; the affected requirements carry the decision. OQ-02 (hardware measurements) and OQ-28 (a schedule) are still open.
 
 | ID | Question | Decision | Affects |
 |---|---|---|---|
@@ -33,6 +33,7 @@ Undecided points, and the record of how each was decided. A decided question kee
 | OQ-22 | Default preset on a fresh device? | **Decided 2026-11-03: `rainbow-wave`.** `nixie` and `classic-blue` are one command away. | FW-FX built-ins table, FW-SET-002 |
 | OQ-23 | Speed as `period` in ms or an abstract `speed`? | **Decided 2026-11-03: `period` in ms** (one cycle per tube); the CLI may offer `--speed 1–100` as sugar mapping to 60 s–0.6 s. | FW-FX-005, HOST-CLI-027 |
 | OQ-24 | Allow a digit `crossfade` that briefly lights two LEDs in one tube? | **Decided 2026-11-03: yes**, opt-in (`cut` stays default), ≤ 1000 ms per transition; the display rule is "one *digit* per tube". | FW-FX-033, FW-DSP-001 |
-| OQ-25 | Night schedule in v1 or v1.1? | **Decided 2026-11-03: v1.1** (needs solid local time first). | FW-FX-035 |
+| OQ-25 | Night schedule in v1 or v1.1? | **Decided 2026-11-03: v1.1** (needs solid local time first). **Superseded 2026-11-07:** the night schedule was dropped (FW-FX-035 withdrawn); see OQ-28. | FW-FX-035 |
 | OQ-26 | JSON request bodies on the effect/preset routes? | **Decided 2026-11-03: yes**, `application/json` ≤ 1024 B on those routes only; everything else stays query-only. | FW-FX §6, FW-BUD-004, FW-API intro, FW-SEC-013 |
-| OQ-27 | Which patterns ship in v1 vs v1.1? | **Decided 2026-11-03.** v1: solid, tubes, wave, gradient, breathe, presets, display basics (leading zero, seconds, cut/crossfade). v1.1: sparkle, chase, fire, strobe, per-tube brightness, night, scramble/carry transitions. | FW-FX status column |
+| OQ-27 | Which patterns ship in v1 vs v1.1? | **Decided 2026-11-03.** v1: solid, tubes, wave, gradient, breathe, presets, display basics (leading zero, seconds, cut/crossfade). v1.1: sparkle, chase, fire, strobe, per-tube brightness, night, scramble/carry transitions. All of v1.1 shipped in v0.2.0 except night, which was withdrawn; matrix and accents were added. | FW-FX status column |
+| OQ-28 | A schedule that changes what the clock shows at chosen times? | **Open (raised 2026-11-07).** Instead of a night brightness cap, the user may want entries the user sets up, each naming a time (or days, or an event) and what to apply then: a preset, an effect, display settings or brightness. Not designed yet: what can trigger an entry, how many entries fit, where they are stored, and how the CLI and API set them. | FW-FX-035 (withdrawn), FW-FX §3 |

@@ -108,7 +108,7 @@ test('HOST-CLI-028 display flags', () => {
     transition: 'crossfade',
     fadeMs: 300,
   });
-  assert.deepEqual(displayChange({ tubeBrightness: '1,2,3,4,5,6', night: 'off' }), { tubeBrightness: [1, 2, 3, 4, 5, 6], night: 'off' });
+  assert.deepEqual(displayChange({ tubeBrightness: '1,2,3,4,5,6' }), { tubeBrightness: [1, 2, 3, 4, 5, 6] });
   assert.throws(() => displayChange({ seconds: 'maybe' }), RangeError);
   assert.throws(() => displayChange({ hours: '13' }), RangeError);
 });

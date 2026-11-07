@@ -980,8 +980,6 @@ void handlePreset() {
 void handleDisplay() {
   if (!authorized()) return;
   if (server.method() == HTTP_POST) {
-    // Named by the spec for v1.1: refused rather than silently ignored under FW-API-007.
-    if (server.hasArg("night")) return sendError(400, "night is not in this firmware yet");
     DisplayOptions next = displayOptions;
     if (server.hasArg("tubeBrightness") && !parseTubeBrightness(server.arg("tubeBrightness").c_str(), next.tubeBrightness)) {
       return sendError(400, "need tubeBrightness=a,b,c,d,e,f with each 0-100");  // FW-FX-034

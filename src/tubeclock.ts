@@ -138,11 +138,8 @@ export interface DisplayOptions {
   tubeBrightness?: number[];
 }
 
-/** A change of display options. `night` is for firmware that has it (FW-FX-035). */
-export type DisplayChange = Partial<DisplayOptions> & {
-  /** `HH:MM,HH:MM,level` or `off` */
-  night?: string;
-};
+/** A change of display options. */
+export type DisplayChange = Partial<DisplayOptions>;
 
 export interface TubeClockOptions {
   host?: string;
@@ -311,7 +308,7 @@ export class TubeClockClient {
 
   /** Changes the display options. The firmware keeps the hour format on its own route, so `hours` goes there first (FW-FX-030). */
   async setDisplay(options: DisplayChange): Promise<DisplayOptions> {
-    const { hours, leadingZero, seconds, transition, fadeMs, tubeBrightness, night } = options;
+    const { hours, leadingZero, seconds, transition, fadeMs, tubeBrightness } = options;
     if (hours !== undefined) await this.setHourFormat(hours);
     const params: Params = {};
     if (leadingZero !== undefined) params.leadingZero = leadingZero ? 1 : 0;
@@ -319,7 +316,6 @@ export class TubeClockClient {
     if (transition !== undefined) params.transition = transition;
     if (fadeMs !== undefined) params.fadeMs = fadeMs;
     if (tubeBrightness !== undefined) params.tubeBrightness = tubeBrightness.join(',');
-    if (night !== undefined) params.night = night;
     if (hours !== undefined && Object.keys(params).length === 0) return this.getDisplay();
     return this.request('POST', '/api/display', params);
   }

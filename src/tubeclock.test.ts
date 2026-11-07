@@ -170,8 +170,8 @@ test('HOST-LIB-036 display options', async () => {
   assert.equal(last().method, 'POST');
   assert.deepEqual(Object.fromEntries(last().query), { leadingZero: '0', seconds: '1', transition: 'crossfade', fadeMs: '300' });
 
-  await c.setDisplay({ tubeBrightness: [1, 2, 3, 4, 5, 6], night: 'off' });
-  assert.deepEqual(Object.fromEntries(last().query), { tubeBrightness: '1,2,3,4,5,6', night: 'off' });
+  await c.setDisplay({ tubeBrightness: [1, 2, 3, 4, 5, 6] });
+  assert.deepEqual(Object.fromEntries(last().query), { tubeBrightness: '1,2,3,4,5,6' });
 
   // FW-FX-030: the hour format has its own route.
   server.requests.length = 0;

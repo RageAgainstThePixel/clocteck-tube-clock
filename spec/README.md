@@ -60,7 +60,7 @@ These documents are the source of truth for the ClocTeck CT-001 project: the rep
 | Attention (flash) | A temporary color override requested by an agent that ends by itself and never changes saved settings. |
 | Effect | A pattern (wave, breathe, fire, …) plus its parameters (palette, direction, period, …), as one JSON object. What the tubes show when no flash is active. |
 | Preset | A named effect: built-in (in flash, read-only) or saved by the user on the device. |
-| Display options | What the digits do: 12/24 h, leading zero, seconds on/off, digit transition, per-tube brightness, night cap. |
+| Display options | What the digits do: 12/24 h, leading zero, seconds on/off, digit transition, per-tube brightness. |
 | Token | The bearer secret `FW_API_TOKEN` that every `/api/*` and `/mcp` request must present. |
 | Core | `firmware/core/`: hardware-independent C++ that builds on the host and the ESP8285. |
 | Emulator | The ESP8266 Arduino core's host emulator (`tests/host`), which runs the sketch as a Linux program. |
