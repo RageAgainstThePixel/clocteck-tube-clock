@@ -75,7 +75,7 @@ export function sampleEffect(overrides: Record<string, unknown> = {}): Record<st
 
 /** Display options as `GET /api/display` returns them (FW-FX-068). */
 export function sampleDisplay(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return { hours: 12, leadingZero: true, seconds: true, transition: 'cut', fadeMs: 200, ...overrides };
+  return { hours: 12, leadingZero: true, seconds: true, transition: 'cut', fadeMs: 200, tubeBrightness: [100, 100, 100, 100, 100, 100], ...overrides };
 }
 
 /** A state object as the new firmware returns it (FW-API-030). */

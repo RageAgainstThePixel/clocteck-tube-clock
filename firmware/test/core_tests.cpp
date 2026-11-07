@@ -775,8 +775,27 @@ static void testEffectParse() {
       {"not json", FxError::kBadJson, "JSON object"},
       {"[1]", FxError::kBadJson, "JSON object"},
       {"{\"pattern\":\"wave\",\"bogus\":1}", FxError::kUnknownField, "unknown field"},
-      {"{\"pattern\":\"wave\",\"density\":1}", FxError::kUnknownField, "unknown field"},  // v1.1
-      {"{\"pattern\":\"fire\"}", FxError::kPattern, "pattern"},                           // v1.1
+      {"{\"pattern\":\"plasma\"}", FxError::kPattern, "pattern"},
+      {"{\"pattern\":\"fire\",\"density\":0}", FxError::kDensity, "density"},  // FW-FX-009
+      {"{\"pattern\":\"fire\",\"density\":101}", FxError::kDensity, "density"},
+      {"{\"pattern\":\"chase\",\"width\":7}", FxError::kWidth, "width"},  // FW-FX-010
+      {"{\"pattern\":\"chase\",\"width\":0}", FxError::kWidth, "width"},
+      {"{\"pattern\":\"chase\",\"count\":0}", FxError::kCount, "count"},
+      {"{\"pattern\":\"chase\",\"count\":\"2\"}", FxError::kCount, "count"},
+      {"{\"pattern\":\"strobe\",\"duty\":101}", FxError::kDuty, "duty"},  // FW-FX-011
+      {"{\"pattern\":\"sparkle\",\"seed\":65536}", FxError::kSeed, "seed"},  // FW-FX-012
+      {"{\"pattern\":\"sparkle\",\"seed\":-1}", FxError::kSeed, "seed"},
+      {"{\"pattern\":\"matrix\",\"glyphs\":1}", FxError::kGlyphs, "glyphs"},  // FW-FX-017
+      {"{\"pattern\":\"wave\",\"accent\":5}", FxError::kAccent, "accent"},    // FW-FX-016
+      {"{\"pattern\":\"wave\",\"accent\":{\"style\":\"wobble\"}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"ms\":49}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"ms\":3001}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"color\":\"nope\"}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"tubes\":\"11111\"}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"tubes\":\"11x111\"}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"spread\":1001}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"strength\":101}}", FxError::kAccent, "accent"},
+      {"{\"pattern\":\"wave\",\"accent\":{\"bogus\":1}}", FxError::kAccent, "accent"},
       {"{\"pattern\":1}", FxError::kPattern, "pattern"},
       {"{\"pattern\":\"wave\",\"palette\":\"#ff0000\"}", FxError::kPalette, "palette"},
       {"{\"pattern\":\"wave\",\"palette\":5}", FxError::kPalette, "palette"},
@@ -842,10 +861,62 @@ static void testEffectParse() {
   CHECK(parseFx("{\"pattern\":\"wave\",\"palette\":\"rainbow\"}", nullptr, rainbow) == FxError::kNone);
   const size_t m = writeEffectJson(rainbow, json, sizeof(json), true, nullptr);
   CHECK(std::string(json, m).find("\"palette\":\"rainbow\"") != std::string::npos);
-  CHECK(std::string(json, m).find("\"pulse\":null,\"preset\":null}") != std::string::npos);  // FW-FX-060 every field
+  CHECK(std::string(json, m).find("\"pulse\":null,\"accent\":null,\"preset\":null}") != std::string::npos);  // FW-FX-060 every field
   CHECK(parseActiveEffect(json, m, again, preset) == FxError::kNone);
   CHECK(again == rainbow && preset[0] == '\0');
   CHECK(parseFx(std::string(json, m), nullptr, again) == FxError::kUnknownField);  // `preset` is not an effect field
+  CHECK(std::string(json, m).find("density") == std::string::npos);                // only the patterns that read them
+
+  // FW-FX-009..012, FW-FX-060: each v1.1 pattern writes its own fields, and they round-trip.
+  const char* const own[] = {
+      "{\"pattern\":\"sparkle\",\"density\":77,\"seed\":65535}",
+      "{\"pattern\":\"fire\",\"density\":1,\"seed\":9}",
+      "{\"pattern\":\"chase\",\"width\":6,\"count\":6}",
+      "{\"pattern\":\"strobe\",\"duty\":0}",
+  };
+  const char* const fields[] = {"\"density\":77,\"seed\":65535", "\"density\":1,\"seed\":9", "\"width\":6,\"count\":6", "\"duty\":0"};
+  for (int i = 0; i < 4; i++) {
+    Effect a;
+    CHECK(parseFx(own[i], nullptr, a) == FxError::kNone);
+    const size_t len = writeEffectJson(a, json, sizeof(json), false, nullptr);
+    CHECK(len > 0 && std::string(json, len).find(fields[i]) != std::string::npos);
+    Effect b;
+    CHECK(parseFx(std::string(json, len), nullptr, b) == FxError::kNone && b == a);
+  }
+  // The largest v1.1 effect still fits the buffers, accent and all.
+  std::string bigChase = big;
+  bigChase.replace(bigChase.find("gradient"), 8, "matrix");
+  bigChase.insert(bigChase.size() - 1,
+                  ",\"density\":100,\"seed\":65535,\"glyphs\":false,"
+                  "\"accent\":{\"style\":\"flicker\",\"ms\":3000,\"color\":\"#ffffff\",\"tubes\":\"110110\",\"spread\":1000,\"strength\":100}");
+  CHECK(bigChase.size() <= kFxMaxBodyBytes && parseFx(bigChase, nullptr, e) == FxError::kNone);
+  const size_t bigLen = writeEffectJson(e, json, sizeof(json), true, "a preset name of 24 char");
+  CHECK(bigLen > 0 && bigLen + 1 < kFxJsonBytes);
+  Effect bigBack;
+  CHECK(parseActiveEffect(json, bigLen, bigBack, preset) == FxError::kNone && bigBack == e);
+
+  // FW-FX-016: the accent round-trips, keeps what a partial body leaves out, survives a pattern
+  // switch, and null removes it.
+  Effect acc;
+  CHECK(parseFx("{\"pattern\":\"wave\",\"accent\":{\"style\":\"dip\",\"tubes\":\"hm\"}}", nullptr, acc) == FxError::kNone);
+  CHECK(acc.hasAccent && acc.accent.style == FxAccentStyle::kDip && acc.accent.ms == 400 && acc.accent.tubes == kAccentHmTubes);
+  CHECK(!acc.accent.hasColor && acc.accent.strength == 100 && acc.accent.spread == 0);
+  size_t accLen = writeEffectJson(acc, json, sizeof(json), false, nullptr);
+  CHECK(std::string(json, accLen).find("\"accent\":{\"style\":\"dip\",\"ms\":400,\"color\":null,\"tubes\":\"hm\",\"spread\":0,\"strength\":100}") != std::string::npos);
+  Effect accNext;
+  CHECK(parseFx("{\"accent\":{\"ms\":900,\"color\":\"red\",\"tubes\":\"100001\"}}", &acc, accNext) == FxError::kNone);
+  CHECK(accNext.accent.style == FxAccentStyle::kDip && accNext.accent.ms == 900 && accNext.accent.hasColor && accNext.accent.tubes == 0x21);
+  accLen = writeEffectJson(accNext, json, sizeof(json), false, nullptr);
+  CHECK(std::string(json, accLen).find("\"color\":\"#ff0000\",\"tubes\":\"100001\"") != std::string::npos);
+  CHECK(parseFx(std::string(json, accLen), nullptr, acc) == FxError::kNone && acc == accNext);
+  CHECK(parseFx("{\"pattern\":\"fire\"}", &accNext, acc) == FxError::kNone && acc.hasAccent && acc.accent.ms == 900);
+  CHECK(parseFx("{\"accent\":{\"color\":null}}", &accNext, acc) == FxError::kNone && !acc.accent.hasColor);
+  CHECK(parseFx("{\"accent\":null}", &accNext, acc) == FxError::kNone && !acc.hasAccent);
+  // FW-FX-017: glyphs belong to matrix; a switch resets them.
+  CHECK(parseFx("{\"pattern\":\"matrix\",\"glyphs\":true}", nullptr, acc) == FxError::kNone && acc.glyphs);
+  accLen = writeEffectJson(acc, json, sizeof(json), false, nullptr);
+  CHECK(std::string(json, accLen).find("\"density\":20,\"seed\":0,\"glyphs\":true") != std::string::npos);
+  CHECK(parseFx("{\"pattern\":\"fire\"}", &acc, accNext) == FxError::kNone && !accNext.glyphs);
 
   // FW-FX-061: a partial body keeps the rest; a pattern switch resets the pattern's own fields.
   Effect base;
@@ -866,6 +937,13 @@ static void testEffectParse() {
   CHECK(parseFx("{\"pulse\":null}", &pulsing, next) == FxError::kNone && !next.hasPulse);
   CHECK(parseFx("{\"pulse\":null}", &breathing, next) == FxError::kNone && next.hasPulse && next.pulse.min == 32);
   CHECK(!(next == base));
+
+  // FW-FX-061: a switch resets the v1.1 fields; a partial body on the same pattern keeps them.
+  Effect chasing;
+  CHECK(parseFx("{\"pattern\":\"chase\",\"width\":3,\"count\":2}", nullptr, chasing) == FxError::kNone);
+  CHECK(parseFx("{\"period\":900}", &chasing, next) == FxError::kNone && next.width == 3 && next.count == 2);
+  CHECK(parseFx("{\"pattern\":\"wave\"}", &chasing, next) == FxError::kNone && next.width == 1 && next.count == 1);
+  CHECK(parseFx("{\"pattern\":\"strobe\",\"duty\":10}", &chasing, next) == FxError::kNone && next.duty == 10 && next.width == 1);
 }
 
 static EffectEngine engineFor(const std::string& json) {
@@ -1033,6 +1111,88 @@ static void testEffectPatterns() {
   CHECK(engineFor("{\"pattern\":\"wave\"}").level(1234) == 255);
   CHECK(engineFor("{\"pattern\":\"solid\",\"pulse\":{\"max\":40,\"period\":0}}").level(4321) == 40);  // `night`
 
+  // FW-FX-025: sparkle rests on the base and flashes the other colors, more often with more density.
+  const Rgb navy{0x10, 0x10, 0x30};
+  auto flashFrames = [&](const std::string& json) {
+    EffectEngine fx = engineFor(json);
+    int flashes = 0;
+    for (uint64_t t = 0; t < 60000; t += 50) {
+      for (int i = 0; i < kTubes; i++) {
+        const Rgb c = fx.tubeColor(i, t);
+        if (!(c == navy)) {
+          flashes++;
+          CHECK(c.b >= navy.b);  // only ever toward the white flash
+        }
+      }
+    }
+    return flashes;
+  };
+  const int sparse = flashFrames("{\"pattern\":\"sparkle\",\"palette\":[\"#101030\",\"#ffffff\"],\"density\":10}");
+  const int dense = flashFrames("{\"pattern\":\"sparkle\",\"palette\":[\"#101030\",\"#ffffff\"],\"density\":90}");
+  CHECK(sparse > 0 && dense > sparse * 4);
+  CHECK(flashFrames("{\"pattern\":\"sparkle\",\"palette\":[\"#101030\",\"#ffffff\"],\"density\":90,\"seed\":1}") > sparse * 4);
+  EffectEngine seedA = engineFor("{\"pattern\":\"sparkle\",\"density\":50,\"seed\":1}");
+  EffectEngine seedB = engineFor("{\"pattern\":\"sparkle\",\"density\":50,\"seed\":2}");
+  bool differs = false;
+  for (uint64_t t = 0; t < 20000 && !differs; t += 50) differs = !(seedA.tubeColor(0, t) == seedB.tubeColor(0, t));
+  CHECK(differs);  // FW-FX-012 the seed picks the sequence
+  // A flash is bright at once and fades: no frame is brighter than the one before it within a flash.
+  EffectEngine lone = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#ffffff\"],\"density\":100}");
+  for (uint64_t t = 0; t < 4000; t += 10) {
+    const Rgb a = lone.tubeColor(2, t), b = lone.tubeColor(2, t + 10);
+    CHECK(b.r <= a.r || a.r == 0);  // FW-FX-025 one color: off between flashes
+  }
+
+  // FW-FX-026: chase. One runner, ltr, a 6 s lap: tube i is fully lit about i s in, and the tube ahead
+  // is still on the base.
+  EffectEngine chase = engineFor("{\"pattern\":\"chase\",\"palette\":[\"#000000\",\"#ffffff\"],\"interpolate\":\"rgb\",\"period\":6000}");
+  for (int i = 0; i + 1 < kTubes; i++) {
+    const uint64_t t = static_cast<uint64_t>(i) * 1000 + 1000;
+    CHECK((chase.tubeColor(i, t + 20) == Rgb{255, 255, 255}));
+    CHECK((chase.tubeColor(i + 1, t) == Rgb{0, 0, 0}));
+  }
+  CHECK(chase.tubeColor(0, 2000).r > 0 && chase.tubeColor(0, 2000).r < 255);  // the tail fades
+  for (uint64_t t = 0; t < 12000; t += 50) {
+    for (int i = 0; i < kTubes; i++) CHECK(near(chase.tubeColor(i, t), chase.tubeColor(i, t + 50), 40));  // glides
+  }
+  EffectEngine chaseRtl = engineFor("{\"pattern\":\"chase\",\"palette\":[\"#000000\",\"#ffffff\"],\"interpolate\":\"rgb\",\"direction\":\"rtl\",\"period\":6000}");
+  for (int i = 0; i < kTubes; i++) CHECK(chaseRtl.tubeColor(i, 3210) == chase.tubeColor(5 - i, 3210));
+  EffectEngine two = engineFor("{\"pattern\":\"chase\",\"palette\":[\"#000000\",\"#ff0000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"period\":6000,\"count\":2}");
+  CHECK((two.tubeColor(0, 1020) == Rgb{255, 0, 0}) && (two.tubeColor(3, 1020) == Rgb{0, 0, 255}));  // spaced, each its color
+  EffectEngine wide = engineFor("{\"pattern\":\"chase\",\"palette\":[\"#000000\",\"#ffffff\"],\"interpolate\":\"rgb\",\"period\":6000,\"width\":3}");
+  CHECK((wide.tubeColor(0, 3000) == Rgb{255, 255, 255}) && (wide.tubeColor(2, 3000) == Rgb{255, 255, 255}));
+  EffectEngine centerChase = engineFor("{\"pattern\":\"chase\",\"palette\":[\"#000000\",\"#ffffff\"],\"direction\":\"center\",\"period\":3000}");
+  for (uint64_t t = 0; t < 3000; t += 100) CHECK(centerChase.tubeColor(1, t) == centerChase.tubeColor(4, t));  // mirrored
+
+  // FW-FX-027: fire stays between its first and last stops, wanders on each tube, and is smooth enough
+  // to read as flicker rather than noise at low density.
+  EffectEngine fire = engineFor("{\"pattern\":\"fire\",\"palette\":[\"#100000\",\"#ff0000\"],\"interpolate\":\"rgb\",\"density\":10,\"period\":0}");
+  int lo = 255, hi = 0;
+  bool independent = false;
+  for (uint64_t t = 0; t < 60000; t += 50) {
+    const Rgb c = fire.tubeColor(0, t);
+    CHECK(c.r >= 0x10 && c.g == 0 && c.b == 0);
+    lo = c.r < lo ? c.r : lo;
+    hi = c.r > hi ? c.r : hi;
+    independent = independent || !(fire.tubeColor(1, t) == c);
+    CHECK(near(c, fire.tubeColor(0, t + 50), 80));
+  }
+  CHECK(lo < 0x50 && hi > 0xd0 && independent);
+  EffectEngine ember = engineFor("{\"pattern\":\"fire\",\"palette\":[\"#ff8000\"],\"interpolate\":\"rgb\",\"density\":30}");
+  for (uint64_t t = 0; t < 5000; t += 50) CHECK(ember.tubeColor(3, t).b == 0 && ember.tubeColor(3, t).r >= ember.tubeColor(3, t).g);
+
+  // FW-FX-028: strobe: the first color for `duty` of each period, then the second; phase offsets tubes.
+  EffectEngine strobe = engineFor("{\"pattern\":\"strobe\",\"palette\":[\"#ff0000\",\"#0000ff\"],\"period\":1000,\"duty\":30,\"phase\":0}");
+  CHECK((strobe.tubeColor(0, 0) == Rgb{255, 0, 0}) && (strobe.tubeColor(0, 299) == Rgb{255, 0, 0}));
+  CHECK((strobe.tubeColor(0, 301) == Rgb{0, 0, 255}) && (strobe.tubeColor(5, 999) == Rgb{0, 0, 255}));
+  EffectEngine police = engineFor("{\"pattern\":\"strobe\",\"palette\":[\"#ff0000\",\"#0000ff\"],\"period\":400,\"phase\":50}");
+  for (uint64_t t = 0; t < 2000; t += 25) {
+    for (int i = 0; i + 1 < kTubes; i++) CHECK(!(police.tubeColor(i, t) == police.tubeColor(i + 1, t)));  // neighbours alternate
+  }
+  EffectEngine blink = engineFor("{\"pattern\":\"strobe\",\"palette\":[\"#ffffff\"],\"period\":1000,\"duty\":0}");
+  CHECK((blink.tubeColor(0, 10) == Rgb{0, 0, 0}));  // one color: off for the rest
+  CHECK((engineFor("{\"pattern\":\"strobe\",\"palette\":[\"#ffffff\"],\"period\":1000,\"duty\":100}").tubeColor(0, 999) == Rgb{255, 255, 255}));
+
   // FW-FX-029, VER-019: pure: the same inputs give the same output, on a second engine too, with no
   // allocation (FW-FX-071), for every pattern.
   const char* const json[] = {
@@ -1041,6 +1201,11 @@ static void testEffectPatterns() {
       "{\"pattern\":\"wave\",\"palette\":\"rainbow\",\"easing\":\"sine\",\"direction\":\"edges\"}",
       "{\"pattern\":\"gradient\",\"palette\":[\"#ff0000\",\"#0000ff\"],\"easing\":\"ease-out\"}",
       "{\"pattern\":\"breathe\",\"palette\":[\"#ff0000\",\"#0000ff\"],\"period\":6000}",
+      "{\"pattern\":\"sparkle\",\"palette\":[\"#101030\",\"#ffffff\",\"#a0c8ff\"],\"density\":60}",
+      "{\"pattern\":\"chase\",\"palette\":[\"#021a02\",\"#00ff41\"],\"count\":3,\"width\":2,\"direction\":\"edges\"}",
+      "{\"pattern\":\"fire\",\"palette\":[\"#4a0000\",\"#ff2a00\",\"#ffd27f\"],\"density\":40,\"period\":4000}",
+      "{\"pattern\":\"strobe\",\"palette\":[\"#ff0000\",\"#0000ff\"],\"period\":400,\"phase\":50}",
+      "{\"pattern\":\"matrix\",\"palette\":[\"#001000\",\"#00c000\",\"#c0ffc0\"],\"density\":50,\"glyphs\":true}",
   };
   for (const char* j : json) {
     EffectEngine a = engineFor(j);
@@ -1072,7 +1237,9 @@ static void testEffectPatterns() {
 
 // FW-FX-040, FW-FX-041, FW-FX-043, FW-FX-044, built-ins table (VER-019)
 static void testPresets() {
-  const char* const names[kBuiltinPresetCount] = {"rainbow-wave", "nixie", "classic-blue", "ocean", "sunset", "synthwave", "aurora", "lava", "candy", "ice", "night", "vaporwave"};
+  const char* const names[kBuiltinPresetCount] = {"rainbow-wave", "nixie", "classic-blue", "ocean", "sunset", "synthwave",
+                                                  "aurora", "lava", "candy", "ice", "night", "vaporwave",
+                                                  "fire", "candle", "christmas", "matrix", "cyberpunk", "twinkle"};
   size_t total = 0;
   for (int i = 0; i < kBuiltinPresetCount; i++) {
     char name[kPresetNameMax + 1];
@@ -1093,7 +1260,7 @@ static void testPresets() {
   }
   CHECK(total <= 8192);                           // FW-FX-074
   CHECK(findBuiltinPreset("RAINBOW-Wave") == 0);  // FW-FX-040 without case
-  CHECK(findBuiltinPreset("fire") == -1);         // v1.1
+  CHECK(findBuiltinPreset("FIRE") == 12);
   CHECK(findBuiltinPreset("mine") == -1);
 
   Effect e;
@@ -1118,6 +1285,20 @@ static void testPresets() {
   CHECK(e.pattern == FxPattern::kGradient && e.period == 0);
   CHECK(loadBuiltinPreset(findBuiltinPreset("night"), e));
   CHECK(e.hasPulse && e.pulse.max == 40);
+  CHECK(loadBuiltinPreset(findBuiltinPreset("fire"), e));
+  CHECK(e.pattern == FxPattern::kFire && e.density == 40 && e.stopCount == 4);
+  CHECK(loadBuiltinPreset(findBuiltinPreset("candle"), e));
+  CHECK(e.pattern == FxPattern::kFire && e.density == 4 && e.period == 8000);
+  CHECK(e.hasAccent && e.accent.style == FxAccentStyle::kFlicker && e.accent.ms == 600);  // FW-FX-016
+  CHECK(loadBuiltinPreset(findBuiltinPreset("christmas"), e));
+  CHECK(e.pattern == FxPattern::kStrobe && e.period == 1600 && e.phase == 50 && e.duty == 50);
+  CHECK(findBuiltinPreset("police") == -1);
+  CHECK(loadBuiltinPreset(findBuiltinPreset("matrix"), e));
+  CHECK(e.pattern == FxPattern::kMatrix && e.period == 1600 && e.density == 30 && e.glyphs && e.stopCount == 3);  // FW-FX-017
+  CHECK(loadBuiltinPreset(findBuiltinPreset("cyberpunk"), e));
+  CHECK(e.pattern == FxPattern::kChase && e.period == 2000 && e.count == 1 && e.width == 2);
+  CHECK(loadBuiltinPreset(findBuiltinPreset("twinkle"), e));
+  CHECK(e.pattern == FxPattern::kSparkle && e.density == 30 && e.stopCount == 3);
 
   CHECK(isValidPresetName("My preset_1-b"));  // FW-FX-040
   CHECK(isValidPresetName("a"));
@@ -1184,12 +1365,32 @@ static void testDisplayOptions() {
   o.leadingZero = false;
   o.transition = FxTransition::kCrossfade;
   o.fadeMs = 300;
-  char json[96];
+  o.tubeBrightness = {{100, 0, 55, 100, 100, 7}};
+  char json[kDisplayJsonBytes];
   size_t n = writeDisplayJson(o, 24, json, sizeof(json));
-  CHECK(std::string(json, n) == "{\"hours\":24,\"leadingZero\":false,\"seconds\":true,\"transition\":\"crossfade\",\"fadeMs\":300}");
+  CHECK(std::string(json, n) ==
+        "{\"hours\":24,\"leadingZero\":false,\"seconds\":true,\"transition\":\"crossfade\",\"fadeMs\":300,\"tubeBrightness\":[100,0,55,100,100,7]}");
   n = writeDisplayJson(o, 0, json, sizeof(json));
   DisplayOptions back;
   CHECK(parseDisplayJson(json, n, back) && back == o);
+  // FW-FX-034: the longest object fits, and a file from before tubeBrightness reads as all 100.
+  DisplayOptions longest;
+  longest.transition = FxTransition::kCrossfade;
+  longest.fadeMs = 1000;
+  CHECK(writeDisplayJson(longest, 24, json, sizeof(json)) > 0);
+  const std::string old = "{\"leadingZero\":false,\"seconds\":true,\"transition\":\"cut\",\"fadeMs\":200}";
+  CHECK(parseDisplayJson(old.data(), old.size(), back) && !back.leadingZero && back.tubeBrightness[3] == 100);
+  for (const char* badLevels : {"[1,2,3]", "[1,2,3,4,5,101]", "[1,2,3,4,5,\"6\"]", "5"}) {
+    const std::string text = "{\"leadingZero\":true,\"seconds\":true,\"transition\":\"cut\",\"fadeMs\":200,\"tubeBrightness\":" + std::string(badLevels) + "}";
+    CHECK(!parseDisplayJson(text.data(), text.size(), back));
+  }
+  std::array<uint8_t, kTubes> levels{};
+  CHECK(parseTubeBrightness("100,0,55,100,100,7", levels) && levels == o.tubeBrightness);  // FW-FX-068
+  std::array<uint8_t, kTubes> kept = levels;
+  for (const char* badText : {"", "1,2,3,4,5", "1,2,3,4,5,6,7", "1,2,3,4,5,101", "1,2,3,4,5,0100", "1,2,3,4,5,x", "1, 2,3,4,5,6", "-1,2,3,4,5,6", "1,2,3,4,5,6,"}) {
+    CHECK(!parseTubeBrightness(badText, levels));
+  }
+  CHECK(!parseTubeBrightness(nullptr, levels) && levels == kept);
   back = DisplayOptions{};
   CHECK(!parseDisplayJson("junk", 4, back));  // FW-FX-052
   CHECK(!parseDisplayJson("{\"leadingZero\":true}", 20, back));
@@ -1199,7 +1400,9 @@ static void testDisplayOptions() {
   FxTransition tr;
   CHECK(parseFxTransition("cut", tr) && tr == FxTransition::kCut);
   CHECK(parseFxTransition("crossfade", tr) && tr == FxTransition::kCrossfade);
-  CHECK(!parseFxTransition("scramble", tr));  // v1.1
+  CHECK(parseFxTransition("scramble", tr) && tr == FxTransition::kScramble);
+  CHECK(parseFxTransition("carry", tr) && tr == FxTransition::kCarry && std::strcmp(fxTransitionName(tr), "carry") == 0);
+  CHECK(!parseFxTransition("bounce", tr));
 
   // FW-FX-033: cut is instant.
   const LedLayout layout = LedLayout::ct001();
@@ -1310,6 +1513,190 @@ static void testComposeFrame() {
   DigitFader hidden;
   composeFrame(layout, engine, attention, hidden, noSeconds, digits, 0, 0, 255, info);
   CHECK(info.digits[4] == kBlank && info.digits[5] == kBlank && !(info.colors[5] == Rgb{0, 0, 0}));
+
+  // FW-FX-034: each tube scaled by its own level, on the effect and on a flash alike.
+  EffectEngine white;
+  CHECK(parseFx("{\"pattern\":\"solid\",\"palette\":[\"#c8c8c8\"],\"period\":0}", nullptr, fx) == FxError::kNone);
+  white.apply(fx);
+  DisplayOptions tamed;
+  tamed.tubeBrightness = {{100, 50, 0, 100, 100, 25}};
+  DigitFader tamedFader;
+  frame = composeFrame(layout, white, attention, tamedFader, tamed, digits, 0, 0, 255, info);
+  CHECK((info.colors[0] == Rgb{200, 200, 200}) && (info.colors[1] == Rgb{100, 100, 100}) && (info.colors[2] == Rgb{0, 0, 0}));
+  CHECK((info.colors[5] == Rgb{50, 50, 50}));
+  CHECK((frame[layout.index[1][digits[1]]] == Rgb{100, 100, 100}));
+  attention.start({0, 0, 100}, 0, 3000, false);  // white
+  composeFrame(layout, white, attention, tamedFader, tamed, digits, 10, 10, 255, info);
+  CHECK((info.colors[0] == Rgb{255, 255, 255}) && (info.colors[1] == Rgb{127, 127, 127}) && (info.colors[2] == Rgb{0, 0, 0}));
+  attention.cancel();
+}
+
+// FW-FX-016, FW-FX-017, FW-FX-033: accents, matrix rain, scramble and carry.
+static void testAccents() {
+  const LedLayout layout = LedLayout::ct001();
+  Attention attention;
+  const DisplayOptions options;
+  FrameInfo info;
+  auto at = [](int sec) { return timeDigits(12, 34, sec, true); };
+  auto engineWith = [](const std::string& accent) {
+    return engineFor("{\"pattern\":\"solid\",\"palette\":[\"#808080\"],\"period\":0,\"accent\":" + accent + "}");
+  };
+  const Rgb gray{0x80, 0x80, 0x80};
+
+  // Dip: dark at the change, back by the end; only the tube that changed; nothing at boot.
+  EffectEngine dip = engineWith("{\"style\":\"dip\",\"ms\":400}");
+  DigitFader fader;
+  composeFrame(layout, dip, attention, fader, options, at(56), 0, 1000, 255, info);
+  for (const Rgb& c : info.colors) CHECK(c == gray);  // the first frame is no change
+  composeFrame(layout, dip, attention, fader, options, at(57), 0, 2000, 255, info);
+  CHECK(info.colors[5].r < 0x08 && (info.colors[4] == gray));
+  composeFrame(layout, dip, attention, fader, options, at(57), 0, 2200, 255, info);
+  CHECK(info.colors[5].r > 0x08 && info.colors[5].r < 0x80);
+  composeFrame(layout, dip, attention, fader, options, at(57), 0, 2400, 255, info);
+  CHECK((info.colors[5] == gray));
+
+  // Flash: the accent color at once, fading back; strength scales it.
+  EffectEngine flash = engineWith("{\"style\":\"flash\",\"ms\":400,\"color\":\"#ff0000\"}");
+  DigitFader f2;
+  composeFrame(layout, flash, attention, f2, options, at(1), 0, 0, 255, info);
+  composeFrame(layout, flash, attention, f2, options, at(2), 0, 1000, 255, info);
+  CHECK(info.colors[5].r > 0xf0 && info.colors[5].g < 0x10);
+  composeFrame(layout, flash, attention, f2, options, at(2), 0, 1200, 255, info);
+  CHECK(info.colors[5].r > 0x80 && info.colors[5].g < 0x80);
+  EffectEngine half = engineWith("{\"style\":\"flash\",\"ms\":400,\"color\":\"#ff0000\",\"strength\":50}");
+  DigitFader f3;
+  composeFrame(layout, half, attention, f3, options, at(1), 0, 0, 255, info);
+  composeFrame(layout, half, attention, f3, options, at(2), 0, 1000, 255, info);
+  CHECK(info.colors[5].r > 0xb0 && info.colors[5].r < 0xd0 && info.colors[5].g > 0x30 && info.colors[5].g < 0x50);
+
+  // Glow rises and falls; the accent color defaults to the palette's last stop.
+  EffectEngine glow = engineFor("{\"pattern\":\"tubes\",\"palette\":[\"#000000\",\"#00ff00\"],\"accent\":{\"style\":\"glow\",\"ms\":400}}");
+  DigitFader f4;
+  composeFrame(layout, glow, attention, f4, options, at(1), 0, 0, 255, info);
+  composeFrame(layout, glow, attention, f4, options, at(2), 0, 1000, 255, info);
+  CHECK((info.colors[4] == Rgb{0, 0, 0}));  // tube 4 shows #000000 and did not change
+  composeFrame(layout, glow, attention, f4, options, at(2), 0, 1200, 255, info);
+  const Rgb glowMid = info.colors[5];
+  CHECK((glowMid == Rgb{0, 255, 0}));  // tube 5 is green already: blending to green keeps it
+  EffectEngine glowRed = engineWith("{\"style\":\"glow\",\"ms\":400,\"color\":\"#ff0000\"}");
+  DigitFader f5;
+  composeFrame(layout, glowRed, attention, f5, options, at(1), 0, 0, 255, info);
+  composeFrame(layout, glowRed, attention, f5, options, at(2), 0, 1000, 255, info);
+  CHECK(near(info.colors[5], gray, 3));
+  composeFrame(layout, glowRed, attention, f5, options, at(2), 0, 1200, 255, info);
+  CHECK(info.colors[5].r > 0xf0 && info.colors[5].g < 0x10);  // the top of the bell
+
+  // Flicker changes from one 40 ms step to the next, and calms down by the end.
+  EffectEngine flicker = engineWith("{\"style\":\"flicker\",\"ms\":600}");
+  bool varied = false;
+  Rgb last{};
+  for (uint32_t age = 0; age < 300; age += 40) {
+    const Rgb c = flicker.accented(5, 3000 + age, gray, age);
+    varied = varied || (age && !(c == last));
+    last = c;
+  }
+  CHECK(varied);
+  CHECK(near(flicker.accented(5, 9999, gray, 599), gray, 2));
+
+  // Shift moves along the palette and comes back.
+  EffectEngine shift = engineFor("{\"pattern\":\"solid\",\"palette\":[\"#ff0000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"period\":0,\"accent\":{\"style\":\"shift\",\"ms\":400}}");
+  CHECK(near(shift.accented(0, 0, Rgb{255, 0, 0}, 200), Rgb{0, 0, 255}, 6));  // half a cycle at the top
+  CHECK(near(shift.accented(0, 0, Rgb{255, 0, 0}, 399), Rgb{255, 0, 0}, 4));
+
+  // Tubes mask: hm ignores the seconds; a minute change still triggers.
+  EffectEngine hm = engineWith("{\"style\":\"dip\",\"ms\":400,\"tubes\":\"hm\"}");
+  DigitFader f6;
+  composeFrame(layout, hm, attention, f6, options, timeDigits(12, 34, 58, true), 0, 0, 255, info);
+  composeFrame(layout, hm, attention, f6, options, timeDigits(12, 34, 59, true), 0, 1000, 255, info);
+  for (const Rgb& c : info.colors) CHECK(c == gray);
+  composeFrame(layout, hm, attention, f6, options, timeDigits(12, 35, 0, true), 0, 2000, 255, info);
+  CHECK(info.colors[3].r < 0x08 && (info.colors[2] == gray));
+  CHECK((info.colors[4] == gray) && (info.colors[5] == gray));  // the seconds changed too, but are masked
+
+  // Spread: the accent reaches each neighbour `spread` ms later; a time jump sets off several at once.
+  EffectEngine ripple = engineWith("{\"style\":\"dip\",\"ms\":300,\"tubes\":\"000001\",\"spread\":100}");
+  DigitFader f7;
+  composeFrame(layout, ripple, attention, f7, options, at(1), 0, 0, 255, info);
+  composeFrame(layout, ripple, attention, f7, options, at(2), 0, 1000, 255, info);
+  CHECK(info.colors[5].r < 0x08 && (info.colors[4] == gray));
+  composeFrame(layout, ripple, attention, f7, options, at(2), 0, 1100, 255, info);
+  CHECK(info.colors[4].r < 0x08 && (info.colors[3] == gray) && info.colors[5].r > 0x08);
+  composeFrame(layout, ripple, attention, f7, options, at(2), 0, 1400, 255, info);
+  CHECK(info.colors[1].r < 0x08 && (info.colors[5] == gray));  // four tubes away, 400 ms on
+
+  // No accent during a flash; hidden seconds never trigger.
+  DigitFader f8;
+  composeFrame(layout, dip, attention, f8, options, at(1), 0, 0, 255, info);
+  attention.start({0, 0, 100}, 900, 3000, false);
+  composeFrame(layout, dip, attention, f8, options, at(2), 0, 1000, 255, info);
+  CHECK((info.colors[5] == Rgb{255, 255, 255}));
+  attention.cancel();
+  DisplayOptions noSeconds;
+  noSeconds.seconds = false;
+  DigitFader f9;
+  composeFrame(layout, dip, attention, f9, noSeconds, at(1), 0, 0, 255, info);
+  composeFrame(layout, dip, attention, f9, noSeconds, at(2), 0, 1000, 255, info);
+  for (const Rgb& c : info.colors) CHECK(c == gray);
+
+  // FW-FX-033 scramble: random digits for fadeMs, then the new one; info.digits is the time throughout.
+  DisplayOptions scramble;
+  scramble.transition = FxTransition::kScramble;
+  scramble.fadeMs = 500;
+  EffectEngine plain = engineFor("{\"pattern\":\"solid\",\"period\":0}");
+  DigitFader sf;
+  composeFrame(layout, plain, attention, sf, scramble, at(1), 0, 0, 255, info);
+  bool scrambled = false;
+  for (uint32_t ms = 1000; ms < 1500; ms += 50) {
+    composeFrame(layout, plain, attention, sf, scramble, at(2), 0, ms, 255, info);
+    CHECK(info.digits[5] == 2 && info.shown[5] >= 0 && info.shown[5] <= 9);
+    scrambled = scrambled || info.shown[5] != 2;
+    CHECK(info.shown[4] == 0);  // the tube that did not change stays put
+  }
+  CHECK(scrambled);
+  composeFrame(layout, plain, attention, sf, scramble, at(2), 0, 1500, 255, info);
+  CHECK(info.shown[5] == 2);
+
+  // Carry: 5 to 0 counts 6, 7, 8, 9, 0 over fadeMs.
+  DisplayOptions carry;
+  carry.transition = FxTransition::kCarry;
+  carry.fadeMs = 500;
+  DigitFader cf;
+  composeFrame(layout, plain, attention, cf, carry, at(55), 0, 0, 255, info);
+  const int8_t want[] = {6, 7, 8, 9, 0};
+  for (int k = 0; k < 5; k++) {
+    composeFrame(layout, plain, attention, cf, carry, at(50), 0, 1000 + static_cast<uint32_t>(k) * 100 + 10, 255, info);
+    CHECK(info.shown[5] == want[k]);
+  }
+  composeFrame(layout, plain, attention, cf, carry, at(50), 0, 1600, 255, info);
+  CHECK(info.shown[5] == 0 && info.shown[4] == 5);
+
+  // FW-FX-017 matrix: drops leave the background for the head, then fade back; glyphs only on drops,
+  // only with glyphs on, and never on a hidden tube.
+  EffectEngine rain = engineFor("{\"pattern\":\"matrix\",\"palette\":[\"#001000\",\"#00c000\",\"#c0ffc0\"],\"interpolate\":\"rgb\",\"period\":1500,\"density\":60,\"glyphs\":true}");
+  int heads = 0, glyphs = 0, background = 0;
+  for (uint64_t t = 0; t < 60000; t += 50) {
+    for (int i = 0; i < kTubes; i++) {
+      const Rgb c = rain.tubeColor(i, t);
+      CHECK(c.g >= 0x10 && c.r <= 0xc0);
+      heads += (c == Rgb{0xc0, 0xff, 0xc0}) ? 1 : 0;
+      background += (c == Rgb{0x00, 0x10, 0x00}) ? 1 : 0;
+      if (rain.glyph(i, t) != kNoGlyph) {
+        glyphs++;
+        CHECK(!(c == Rgb{0x00, 0x10, 0x00}));  // a glyph is always on a drop
+      }
+    }
+  }
+  CHECK(heads > 50 && glyphs > heads && background > 1000);
+  EffectEngine dry = engineFor("{\"pattern\":\"matrix\",\"period\":1500,\"density\":100}");
+  for (uint64_t t = 0; t < 5000; t += 50) CHECK(dry.glyph(0, t) == kNoGlyph);
+  DigitFader mf;
+  bool covered = false;
+  for (uint32_t ms = 0; ms < 20000; ms += 50) {
+    composeFrame(layout, rain, attention, mf, noSeconds, at(1), ms, ms, 255, info);
+    CHECK(info.shown[4] == kBlank && info.shown[5] == kBlank && info.digits[0] == 1);
+    covered = covered || info.shown[0] != 1 || info.shown[1] != 2;
+  }
+  CHECK(covered);
 }
 
 // FW-MCP-036, HOST-LIB-020: the expected values come from src/color.ts's hexToHsv.
@@ -1715,6 +2102,7 @@ int main() {
   testEffectPatterns();
   testPresets();
   testDisplayOptions();
+  testAccents();
   testComposeFrame();
   testLastSyncReference();
   testBeepPattern();

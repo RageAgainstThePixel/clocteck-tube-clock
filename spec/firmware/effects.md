@@ -1,6 +1,6 @@
 # Effects, display options and presets (`FW-FX`)
 
-Everything the tubes show, apart from the digits themselves and attention flashes, is driven by **data**: an *effect* (a pattern plus parameters), *display options* (what the digits do) and *presets* (named effects, built-in or saved by the user). No pattern is a one-off mode; adding a preset is adding JSON, not code. The status column says what shipped in v1 and what follows in v1.1 (OQ-27, decided); v1.1 rows are still Planned, and until then their fields and patterns are refused as unknown (FW-FX-013). What can only be seen on the tubes waits for checklist 14..16.
+Everything the tubes show, apart from the digits themselves and attention flashes, is driven by **data**: an *effect* (a pattern plus parameters), *display options* (what the digits do) and *presets* (named effects, built-in or saved by the user). No pattern is a one-off mode; adding a preset is adding JSON, not code. The status column says what shipped in v1 and what follows in v1.1 (OQ-27, decided). The sparkle, chase, fire, strobe and matrix patterns, their fields, per-tube brightness, accents and the scramble/carry transitions were built on 2026-11-07; `night` is still Planned, and refused until then. What can only be seen on the tubes waits for checklist 14..16.
 
 Supersedes the `wave` color mode rows FW-DSP-020..028, FW-API-021/041 and FW-SET-014 (their IDs stay, marked superseded). The left-to-right wave the user asked for is the built-in preset `rainbow-wave`, the default (OQ-22, decided). The design choices OQ-21..27 were all decided 2026-11-03 as written here.
 
@@ -18,11 +18,14 @@ An effect is one JSON object. Every field has a default, so `{"pattern":"wave"}`
   "phase": 8,
   "drift": 0,
   "easing": "linear",
-  "pulse": { "min": 64, "max": 255, "period": 4000, "easing": "sine" },
-  "density": 20,
-  "width": 1,
-  "duty": 50
+  "pulse": { "min": 64, "max": 255, "period": 4000, "easing": "sine" }
 }
+```
+
+The v1.1 patterns add their own fields: `density` and `seed` for sparkle, fire and matrix, `glyphs` for matrix, `width` and `count` for chase, `duty` for strobe. They are accepted on any pattern but only written back on the patterns that read them. `accent` belongs to every pattern and is always written, `null` when there is none:
+
+```json
+{ "pattern": "fire", "accent": { "style": "flicker", "ms": 600, "color": null, "tubes": "all", "spread": 0, "strength": 100 } }
 ```
 
 | ID | Field | Rule | Status |
@@ -35,10 +38,12 @@ An effect is one JSON object. Every field has a default, so `{"pattern":"wave"}`
 | FW-FX-006 | `phase` | Offset between tubes as percent of `period` per unit of distance, 0–100, default 8 (≈ 30° of a rainbow). Tube `i`'s position in the cycle is `pos(i,t) = (t / period − d(i) × phase / 100) mod 1`. | v1. Done |
 | FW-FX-007 | `easing` | How `pos` maps to the palette: `linear` (default), `sine`, `ease-in`, `ease-out`, `ease-in-out`, `step` (hard switches at stop boundaries, no fade). | v1. Done. A `step` palette switches to within 1/64 of a cycle (the lookup's resolution). |
 | FW-FX-008 | `pulse` | Optional brightness envelope on any pattern: `{min 0–255, max 0–255, period ms, easing}`; the global brightness is scaled by the envelope. Default none. `min ≤ max`. | v1. Done. A missing field takes `min` 0, `max` 255, `period` 4000, `easing` sine; `period` 0 holds `max`, `null` removes the pulse. The envelope runs min → max → min over `period`. |
-| FW-FX-009 | `density` | 1–100, sparkle/fire only: how many events per second per tube, scaled. Default 20. | v1.1 |
-| FW-FX-010 | `width` | 1–6, chase only: how many adjacent tubes a runner covers. Default 1. `count` 1–6 runners, default 1. | v1.1 |
-| FW-FX-011 | `duty` | 0–100, strobe only: percent of each period the first color is on. Default 50. | v1.1 |
-| FW-FX-012 | `seed` | 0–65535, optional: fixes the pseudo-random sequence of sparkle/fire so the emulator tests are deterministic. Default: from `millis()` at apply. | v1.1 |
+| FW-FX-009 | `density` | 1–100, sparkle/fire only: how busy. Sparkle: the chance, in percent, that a tube flashes in each 400 ms slot. Fire: the flicker's step is `4000 / density` ms, never under one 50 ms frame. Default 20. | v1.1. Done (host-tested) |
+| FW-FX-010 | `width` | 1–6, chase only: how many tubes a runner holds full. Default 1. `count` 1–6 runners, evenly spaced, default 1. | v1.1. Done (host-tested) |
+| FW-FX-011 | `duty` | 0–100, strobe only: percent of each period the first color is on. Default 50. | v1.1. Done (host-tested) |
+| FW-FX-016 | `accent` | What a tube does when its digit changes, on top of any pattern; `null` (default) for nothing. `{style, ms, color, tubes, spread, strength}`: `style` `flicker` (a random dip or lift every 40 ms, calming as it ends), `flash` (the accent color at once, fading back), `dip` (dark at the change, glowing back), `glow` (a rise to the accent color and back) or `shift` (along the palette by up to half a cycle and back); `ms` 50–3000, default 400; `color` a color or `null` for the palette's last stop; `tubes` the tubes whose change triggers it, `all` (default), `hm` (hours and minutes) or six of `0`/`1` left to right; `spread` 0–1000 ms per tube for the accent to ripple out to neighbours, default 0 (only the tube that changed); `strength` 0–100, default 100. A missing field keeps the current value, like `pulse`. It survives a pattern switch. Never on the first frame, on a tube going blank, or during an attention flash; a time correction that changes several digits sets off several tubes at once (decided 2026-11-07: keep it). | v1.1. Done (host-tested) |
+| FW-FX-017 | `glyphs` | `true`/`false`, matrix only, default false: while a drop's head passes, the tube shows random digits (a new one every 60 ms), then the time again. The one exception to "colors never move a digit" (FW-DSP-025), and opt-in. Never on a hidden or blank tube, or during a flash. | v1.1. Done (host-tested) |
+| FW-FX-012 | `seed` | 0–65535: picks the pseudo-random sequence of sparkle/fire. Default 0. The sequence is a hash of the seed, the tube and the time, so every seed already looks random, and the same seed always gives the same frames (FW-FX-029). | v1.1. Done (host-tested). Not taken from `millis()` as first planned: a fixed default keeps the pattern pure. |
 | FW-FX-013 | Unknown fields are rejected (`400`), not ignored, so typos in presets are caught. Values out of range are `400` with the field name in the message. | v1. Done |
 | FW-FX-014 | Serialized size of an effect ≤ 1024 bytes; palette ≤ 8 stops. | v1. Done |
 | FW-FX-015 | `drift` | `wave` only: milliseconds for one full sway of the wave's direction, 0 or 100–600000, default 0 (off). While it is on, `direction` is not read: the wave moves smoothly from `rtl` through `center` to `ltr` and back, at an uneven rate, with no jump in color. A clock's effect saved before this field existed loads with drift off. | Done (host-tested, `testEffectMath`; running on the clock since 2026-11-07, used by `aurora` and `lava`). |
@@ -54,10 +59,11 @@ Each pattern says which fields it reads; the others are accepted and ignored.
 | FW-FX-022 | `wave` | The palette travels across the tubes: tube `i` shows `palette(ease(pos(i,t)))`. `rainbow-wave` is this with a rainbow palette evened out in brightness (a `palette:"rainbow"` wave stays available). Adjacent tubes fade into each other continuously; nothing steps. | all of §1 except density/width/duty | v1. Done (host-tested; seen on tubes: checklist 14) |
 | FW-FX-023 | `gradient` | A static spread of the palette across the six tubes in `direction` order (`phase` ignored, spread fixed at one palette length across the tubes); `period > 0` drifts it slowly. | palette, direction, period, easing, pulse | v1. Done (host-tested; seen on tubes: checklist 14). With `center` and `edges` the palette length runs from the middle (or the ends) over the three distances, mirrored. |
 | FW-FX-024 | `breathe` | `solid` with a built-in pulse: brightness swings `pulse.min..max` (default 32..255) over `period` with `easing` (default `sine`); the color advances one palette stop per breath. | palette, period, easing, pulse | v1. Done (host-tested; seen on tubes: checklist 14). `pulse.min`/`max` are the swing; `pulse.period` is not read. |
-| FW-FX-025 | `sparkle` | Base color `palette[0]`; random tubes flash `palette[1..]` for ~150 ms at `density` events/s. | palette, density, seed, pulse | v1.1 |
-| FW-FX-026 | `chase` | `count` runners of `width` tubes in `palette[1..]` move over a `palette[0]` base in `direction`, one lap per `period`. | palette, direction, period, width, count, pulse | v1.1 |
-| FW-FX-027 | `fire` | Each tube flickers independently between the palette stops with a random walk at `density` steps/s; `period` sets the slowest drift. Looks like flame or candle depending on the palette and density. | palette, period, density, seed, pulse | v1.1 |
-| FW-FX-028 | `strobe` | Hard switch between `palette[0]` (on for `duty` % of `period`) and `palette[1]`; `phase` offsets tubes so `phase:50` with `direction:edges` makes the two halves alternate (police). | palette, period, phase, direction, duty | v1.1 |
+| FW-FX-025 | `sparkle` | Base color `palette[0]`; random tubes flash one of `palette[1..]`, bright at once and fading back over 250 ms, at most once per 400 ms slot, as often as `density` says. Each tube's slots start at their own time. With one color the base is off and the flashes are that color. | palette, interpolate, density, seed, pulse | v1.1. Done (host-tested) |
+| FW-FX-026 | `chase` | `count` runners in `palette[1..]` (runner k takes stop `1 + k mod (n-1)`) move over a `palette[0]` base in `direction`, one lap per `period`. A runner fades in over half a tube, holds `width` tubes full and leaves a 1.5-tube tail, so it glides. `center` and `edges` run mirrored on both halves. With one color the base is off. | palette, interpolate, direction, period, width, count, pulse | v1.1. Done (host-tested) |
+| FW-FX-027 | `fire` | Each tube wanders on its own between the first and the last palette stop (no wrap, so a dark-to-bright palette never jumps): smooth value noise with a step of `4000 / density` ms, averaged with a slower one over `period` (`0` for none). Looks like flame or candle depending on the palette and density. With one color it flickers between off and that color. | palette, interpolate, period, density, seed, pulse | v1.1. Done (host-tested) |
+| FW-FX-028 | `strobe` | Hard switch between `palette[0]` (on for `duty` % of `period`) and `palette[1]`, or off with one color. `phase` and `direction` offset the tubes as a wave's are, so `phase:50` with `ltr` makes neighbouring tubes alternate (`christmas`). | palette, period, phase, direction, duty, pulse | v1.1. Done (host-tested). The first draft said `edges` would make the two halves alternate; with these distances it cannot. |
+| FW-FX-019 | `matrix` | Digital rain: each tube is a column. In each `period` slot (1500 ms if 0) a drop falls with a chance of `density` percent, taking two thirds of the slot: the head color for the first eighth, a quick blend to the tail color, then a long fade to the background. Palette: background, tail, head (the last stop); two colors have no separate head; one has the background off. Each tube's slots start at their own time. With `glyphs` the drop also shows random digits (FW-FX-017). | palette, interpolate, period, density, seed, glyphs, pulse | v1.1. Done (host-tested) |
 | FW-FX-029 | New patterns are added by name in this table and in the core's pattern registry; they MUST be pure functions of `(effect, tube, t, seed)` so they are host-testable (VER-019). | | rule |
 
 ## 3. Display options
@@ -69,8 +75,8 @@ Separate from the effect and persisted on their own (FW-FX-050). They control th
 | FW-FX-030 | `hours` | `12` or `24` (the existing `/api/hours`, FW-API-014). | Done |
 | FW-FX-031 | `leadingZero` | `true` (default) shows `09:05:00`; `false` blanks the hours-tens tube when it would be 0. | v1. Done |
 | FW-FX-032 | `seconds` | `true` (default) shows seconds on tubes 5–6; `false` blanks them (the effect still colors them, so the wave stays continuous across all six). | v1. Done |
-| FW-FX-033 | `transition` | How a tube changes digit: `cut` (default, instant) or `crossfade` (old digit LED fades out while the new fades in over `fadeMs`, 50–1000, default 200). `scramble` and `carry` (the stock effects) are **optional** values for v1.1 and are only ever used when the user chooses them; no pattern triggers a digit effect (FW-DSP-025). Crossfade lights two LEDs in one tube for at most `fadeMs` (OQ-24, decided: allowed, opt-in). | v1. Done (host-tested; seen on tubes: checklist 16); scramble/carry v1.1 |
-| FW-FX-034 | `tubeBrightness` | Six values 0–100 %, default all 100, multiplied into each tube after the effect and the global brightness. Lets the user tame an uneven tube. | v1.1 |
+| FW-FX-033 | `transition` | How a tube changes digit: `cut` (default, instant) or `crossfade` (old digit LED fades out while the new fades in over `fadeMs`, 50–1000, default 200). `scramble` and `carry` are **optional** values, only ever used when the user chooses them: for `fadeMs` after a change, `scramble` shows a random digit every 50 ms and `carry` counts up from the old digit to the new one like an odometer (5 → 6, 7, 8, 9, 0), then the new digit holds. Neither runs from or to a blank tube. No pattern triggers a digit effect (FW-DSP-025), except matrix glyphs (FW-FX-017). Crossfade lights two LEDs in one tube for at most `fadeMs` (OQ-24, decided: allowed, opt-in). | v1. Done (host-tested; seen on tubes: checklist 16); scramble/carry v1.1, done (host-tested) |
+| FW-FX-034 | `tubeBrightness` | Six values 0–100 %, left to right, default all 100, multiplied into each tube after the effect and the global brightness. Lets the user tame an uneven tube. It also scales attention flashes, so a tamed tube stays tamed. | v1.1. Done (host-tested; API test across a restart). A `/display.json` from before it reads as all 100. |
 | FW-FX-035 | `night` | Optional `{from:"22:00", to:"07:00", brightness:0-255}` in local time; between `from` and `to` the global brightness is capped at `brightness`. Attention flashes ignore the cap. | v1.1 (OQ-25, decided) |
 | FW-FX-036 | Global `brightness` 0–255 (FW-API-013) stays the master level; effect `pulse`, `tubeBrightness` and `night` only ever scale it down. | v1. Done |
 
@@ -103,12 +109,12 @@ A preset is a named effect. Built-in presets are JSON in PROGMEM; user presets a
 | `ice` | gradient | `#e0f7ff #8ad4ff #ffffff` | static (period 0). | v1 |
 | `night` | solid | `#ff8c1a` | pulse max 40: a dim amber for bedrooms. | v1 |
 | `vaporwave` | solid | `#c05400 #d64300 #f23500 #ff1888 #ff08e0 #a838ff #00a0b0 #a838ff` | rgb, period 16 s: one color across, even brightness. | v1 |
-| `fire` | fire | `#4a0000 #ff2a00 #ff8c00 #ffd27f` | density 40. | v1.1 |
-| `candle` | fire | `#3a1a00 #ff9a3c #ffd9a0` | density 12, period 4 s. | v1.1 |
-| `police` | strobe | `#ff0000 #0000ff` | period 400 ms, duty 50, phase 50, edges. | v1.1 |
-| `matrix` | chase | `#021a02 #00ff41 #0a8a2a` | rtl, period 1.2 s, count 2, width 1. | v1.1 |
-| `cyberpunk` | chase | `#ff00a0 #fcee0a #00f0ff` | ltr, period 2 s, count 1, width 2. | v1.1 |
-| `twinkle` | sparkle | `#101030 #ffffff #a0c8ff` | density 30. | v1.1 |
+| `fire` | fire | `#4a0000 #ff1800 #ff5000 #ff9000` | rgb, density 40, period 6 s. No blue, so the brightest flicker stays amber instead of washing out white (tuned by eye). | v1.1 |
+| `candle` | fire | `#300800 #ff4000 #ff7a10` | rgb, density 4, period 8 s, accent flicker 600 ms on all tubes: a slow flame that catches when a digit changes. Slowed by eye; the flare is a starting point. | v1.1 |
+| `christmas` | strobe | `#ff1000 #00d000` | period 1.6 s, duty 50, phase 50, ltr: neighbouring tubes alternate red and green like a string of lights. Replaced the planned `police` (decided 2026-11-07). | v1.1 |
+| `matrix` | matrix | `#008000 #00ff00 #50ff00` | rgb, period 1.6 s, density 30, glyphs on. No blue and a bright background: darker or bluer greens read as dim or teal (tuned by eye). | v1.1 |
+| `cyberpunk` | chase | `#ff00a0 #fcee0a #00f0ff` | rgb, ltr, period 2 s, count 1, width 2. Approved by eye as is. | v1.1 |
+| `twinkle` | sparkle | `#1c38b0 #ffffff #a0c8ff` | rgb, density 30. A royal blue base: navy read as too dark (tuned by eye). | v1.1 |
 
 ## 5. Persistence
 
@@ -126,14 +132,14 @@ JSON **request bodies** are allowed on these routes only (an exception to the qu
 | ID | Method, path | Body / args | Success | Errors | Status |
 |---|---|---|---|---|---|
 | FW-FX-060 | `GET /api/effect` | — | `200` the active effect with every field filled in, plus `preset` | 401 | v1. Done |
-| FW-FX-061 | `PUT /api/effect` | effect JSON (partial allowed: missing fields keep their current value; `pattern` switches reset pattern-specific fields to defaults) | `200` the resulting effect | 400, 401, 413 | v1. Done. In v1 the fields a pattern switch resets are `breathe`'s `easing` and `pulse`, going in or out of it. |
+| FW-FX-061 | `PUT /api/effect` | effect JSON (partial allowed: missing fields keep their current value; `pattern` switches reset pattern-specific fields to defaults) | `200` the resulting effect | 400, 401, 413 | v1. Done. In v1 the fields a pattern switch resets are `breathe`'s `easing` and `pulse`, going in or out of it; since v1.1 any switch also resets `density`, `seed`, `width`, `count`, `duty` and `glyphs`, and keeps `accent`. |
 | FW-FX-062 | `POST /api/tube` (existing) | — | now also sets the active effect to `tubes` with the saved tube colors (preset `null`) | | v1. Done |
 | FW-FX-063 | `GET /api/presets` | — | `200` list (FW-FX-044) | 401 | v1. Done |
 | FW-FX-064 | `GET /api/preset?name=` | — | `200` that preset's effect | 401, 404 | v1. Done |
 | FW-FX-065 | `POST /api/preset?name=` | — | `200` state; the preset is now active | 401, 404 | v1. Done |
 | FW-FX-066 | `PUT /api/preset?name=` | effect JSON, or empty body = save the current active effect | `200` the saved effect | 400, 401, 403 (built-in name), 413, 507 (full) | v1. Done. A body needs `pattern` (FW-FX-001), unlike `PUT /api/effect`. A bad name is `400`. |
 | FW-FX-067 | `DELETE /api/preset?name=` | — | `200 {"ok":true}` | 401, 403 (built-in), 404 | v1. Done |
-| FW-FX-068 | `GET /api/display` / `POST /api/display` | query args `leadingZero=0\|1`, `seconds=0\|1`, `transition=cut\|crossfade`, `fadeMs=50-1000`, later `tubeBrightness=a,b,c,d,e,f`, `night=HH:MM,HH:MM,level` or `night=off` | `200` display options | 400, 401 | v1. Done. `tubeBrightness` and `night` are `400` until v1.1, rather than ignored. The answer also has `hours` (FW-FX-030), set through `/api/hours`. |
+| FW-FX-068 | `GET /api/display` / `POST /api/display` | query args `leadingZero=0\|1`, `seconds=0\|1`, `transition=cut\|crossfade\|scramble\|carry`, `fadeMs=50-1000`, `tubeBrightness=a,b,c,d,e,f` (each 0–100), later `night=HH:MM,HH:MM,level` or `night=off` | `200` display options | 400, 401 | v1. Done. `tubeBrightness` since v1.1; `night` is `400` until it exists, rather than ignored. The answer also has `hours` (FW-FX-030), set through `/api/hours`, and `tubeBrightness`. |
 | FW-FX-069 | The state object (FW-API-030) gains `preset` (name or `null`), `effect: {pattern}` and `display: {hours, leadingZero, seconds, transition}`; the full effect is only on `/api/effect` to keep the state small (FW-BUD-005). | v1. Done |
 
 ## 7. Rendering and budgets
@@ -145,7 +151,7 @@ JSON **request bodies** are allowed on these routes only (an exception to the qu
 | FW-FX-072 | CPU per frame ≤ **5 ms** at 80 MHz for any pattern (NeoPixel `show()` for 60 LEDs takes ~1.8 ms on top). Measured in the emulator with `clock_gettime` and on the device with `micros()`; logged once a minute as `[fx] frame max=<us>`. | v1. Partial: measured on the emulator, under 100 µs for each pattern (VER-021). The line is also logged when the effect changes. **Gap:** no figure from the clock yet (checklist 15). |
 | FW-FX-073 | RAM: active effect ≤ 512 B, palette LUT 192 B, easing LUT 64 B, display options ≤ 64 B, sparkle/fire state ≤ 64 B; parsing uses one 2 KB ArduinoJson document that is freed after apply. Total steady-state < 1 KB. | v1. Done by the build's map: about 380 B of variables (effect, LUT, display options, digit fades, log state) plus 661 B of constant strings, which the budget's list leaves out. Free heap on the device: checklist 15. |
 | FW-FX-074 | Flash: engine + patterns ≤ 24 KB of code, built-in presets ≤ 8 KB PROGMEM, LittleFS 64 KB. Image budget becomes 470 KB (FW-BUD-001). | v1. Done by the build's map: `effect.cpp` is 18.3 KB of flash, including the ArduinoJson template code it instantiates and about 1.2 KB of preset data; none of it in IRAM. LittleFS and its FS layer add about 26 KB. |
-| FW-FX-075 | The emulator's `[leds]` log is rate-limited to one line per second while an effect is animating (was FW-DSP-027), plus one line on every digit change. | v1. Done. Every line goes out at most once a second while colors move, or at once when digits, `lit` or a flash change. |
+| FW-FX-075 | The emulator's `[leds]` log is rate-limited to one line per second while an effect is animating (was FW-DSP-027), plus one line on every digit change. | v1. Done. Every line goes out at most once a second while colors move, or at once when digits, `lit` or a flash change. The digits a scramble, carry or glyph shows on the way count as moving, so they don't flood the log; the line prints what the LEDs show. |
 
 ## 8. MCP
 

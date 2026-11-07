@@ -63,7 +63,7 @@ Every write returns the new state (the effect routes return the effect), and onl
 
 ## Effects
 
-What the tubes show is data: a pattern (`solid`, `tubes`, `wave`, `gradient`, `breathe`) with a palette, direction, period, phase, drift, easing and optional pulse ([spec](../spec/firmware/effects.md)). A fresh clock shows the `rainbow-wave` preset. Twelve presets are built in and up to 16 more can be saved. Effect, display options and presets live on a 64 KB LittleFS beside the 80-byte EEPROM settings; an attention flash overrides the effect and the effect carries on behind it.
+What the tubes show is data: a pattern (`solid`, `tubes`, `wave`, `gradient`, `breathe`, `sparkle`, `chase`, `fire`, `strobe`, `matrix`) with a palette, direction, period, phase, drift, easing, optional pulse, the newer patterns' own density, width, count, duty, seed and glyphs, and an optional accent: what a tube does when its digit changes ([spec](../spec/firmware/effects.md)). Digits can cut, crossfade, scramble or carry, and each tube can be dimmed on its own. A fresh clock shows the `rainbow-wave` preset. Eighteen presets are built in and up to 16 more can be saved. Effect, display options and presets live on a 64 KB LittleFS beside the 80-byte EEPROM settings; an attention flash overrides the effect and the effect carries on behind it.
 
 ## Secrets
 

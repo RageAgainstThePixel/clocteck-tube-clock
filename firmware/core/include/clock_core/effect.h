@@ -20,7 +20,7 @@ constexpr size_t kFxMaxBodyBytes = 1024;  // FW-FX-014, FW-BUD-004
 // FW-FX-073: the parse document, freed after apply: 2 KB on the device. JSON slots are twice the size
 // on a 64-bit host, so the tests get the same capacity rather than the same bytes.
 constexpr size_t kFxArenaBytes = 2048 * (sizeof(void*) / 4);
-constexpr size_t kFxJsonBytes = 640;      // the longest effect writeEffectJson can produce
+constexpr size_t kFxJsonBytes = 768;      // the longest effect writeEffectJson can produce
 constexpr uint8_t kFxNoAt = 255;          // a palette stop without an explicit `at`
 constexpr size_t kPresetNameMax = 24;     // FW-FX-040
 constexpr int kMaxUserPresets = 16;       // FW-FX-042
@@ -29,7 +29,7 @@ constexpr size_t kPresetLineBytes = kPresetNameMax + 1 + kFxJsonBytes + 2;
 /// The time between the last change and /effect.json being written (FW-FX-051).
 constexpr uint32_t kFxSaveDebounceMs = 2000;
 
-enum class FxPattern : uint8_t { kSolid, kTubes, kWave, kGradient, kBreathe };
+enum class FxPattern : uint8_t { kSolid, kTubes, kWave, kGradient, kBreathe, kSparkle, kChase, kFire, kStrobe, kMatrix };
 enum class FxInterpolate : uint8_t { kHsv, kRgb };
 enum class FxDirection : uint8_t { kLtr, kRtl, kCenter, kEdges };
 enum class FxEasing : uint8_t { kLinear, kSine, kEaseIn, kEaseOut, kEaseInOut, kStep };
@@ -53,6 +53,29 @@ struct FxPulse {
   }
 };
 
+/// FW-FX-016: what a tube does when its digit changes, on top of any pattern.
+enum class FxAccentStyle : uint8_t { kFlicker, kFlash, kDip, kGlow, kShift };
+constexpr uint8_t kAccentAllTubes = 0x3F;  // bit t = tube t, left to right
+constexpr uint8_t kAccentHmTubes = 0x0F;   // hours and minutes
+constexpr uint32_t kAccentMinMs = 50;
+constexpr uint32_t kAccentMaxMs = 3000;
+constexpr uint32_t kAccentMaxSpreadMs = 1000;
+
+struct FxAccent {
+  FxAccentStyle style = FxAccentStyle::kGlow;
+  uint16_t ms = 400;
+  bool hasColor = false;  // without one, the palette's last stop
+  Rgb color{};
+  uint8_t tubes = kAccentAllTubes;
+  uint16_t spread = 0;     // ms per tube the accent takes to reach a neighbour, 0 for none
+  uint8_t strength = 100;  // 0-100
+
+  bool operator==(const FxAccent& o) const {
+    return style == o.style && ms == o.ms && hasColor == o.hasColor && (!hasColor || color == o.color) && tubes == o.tubes &&
+           spread == o.spread && strength == o.strength;
+  }
+};
+
 /// One effect, every field filled in (FW-FX-001..008).
 struct Effect {
   FxPattern pattern = FxPattern::kWave;
@@ -67,6 +90,14 @@ struct Effect {
   FxEasing easing = FxEasing::kLinear;
   bool hasPulse = false;
   FxPulse pulse;
+  uint8_t density = 20;  // FW-FX-009: sparkle and fire, 1-100
+  uint8_t width = 1;     // FW-FX-010: chase, tubes per runner, 1-6
+  uint8_t count = 1;     // FW-FX-010: chase, runners, 1-6
+  uint8_t duty = 50;     // FW-FX-011: strobe, percent of a period on the first color
+  uint16_t seed = 0;     // FW-FX-012: sparkle, fire and matrix, which random sequence
+  bool glyphs = false;   // FW-FX-017: matrix, random digits while a drop passes
+  bool hasAccent = false;
+  FxAccent accent;  // FW-FX-016
 
   /// The defaults for a pattern: nixie neon orange, and for `breathe` a sine swing over 32..255 (FW-FX-024).
   static Effect defaults(FxPattern pattern);
@@ -96,6 +127,13 @@ enum class FxError : uint8_t {
   kEasing,
   kPulse,
   kPulseMinMax,
+  kDensity,
+  kWidth,
+  kCount,
+  kDuty,
+  kSeed,
+  kGlyphs,
+  kAccent,
 };
 
 /// The message for a 400 answer. It names the field and the valid form and never echoes the request
@@ -153,58 +191,92 @@ class EffectEngine {
   /// The envelope at `tMs`, 0-255, 255 = no dimming: `pulse`, or the swing of `breathe` (FW-FX-008).
   uint8_t level(uint64_t tMs) const;
 
+  /// FW-FX-016: `base` with the accent applied, `ageMs` after it reached this tube (< accent.ms).
+  Rgb accented(int tube, uint64_t tMs, const Rgb& base, uint32_t ageMs) const;
+
+  /// FW-FX-017: the random digit a matrix drop shows on this tube, or kNoGlyph.
+  int8_t glyph(int tube, uint64_t tMs) const;
+
  private:
   Rgb lookup(uint32_t pos16) const;
   Rgb eased(uint16_t pos16) const;
+  Rgb sparkle(int tube, uint64_t tMs) const;
+  Rgb chase(int tube, uint32_t cycle) const;
+  Rgb fire(int tube, uint64_t tMs) const;
+  Rgb strobe(int tube, uint32_t cycle) const;
+  Rgb matrix(int tube, uint64_t tMs) const;
+  /// Where a matrix drop is on this tube, 0..65535 through it; false when no drop is passing.
+  bool matrixDrop(int tube, uint64_t tMs, uint32_t& progress) const;
 
   Effect effect_;
   Rgb lut_[kFxLutEntries];
 };
 
+constexpr int8_t kNoGlyph = -128;
+
 // ---- Display options (FW-FX-031..033) ----
 
-enum class FxTransition : uint8_t { kCut, kCrossfade };
+/// FW-FX-033: how a tube changes digit. Scramble shows random digits, carry counts up to the new one.
+enum class FxTransition : uint8_t { kCut, kCrossfade, kScramble, kCarry };
 
 struct DisplayOptions {
   bool leadingZero = true;
   bool seconds = true;
   FxTransition transition = FxTransition::kCut;
   uint16_t fadeMs = 200;  // 50-1000
+  /// FW-FX-034: percent per tube, left to right, multiplied in after everything else.
+  std::array<uint8_t, kTubes> tubeBrightness{{100, 100, 100, 100, 100, 100}};
 
   bool operator==(const DisplayOptions& o) const {
-    return leadingZero == o.leadingZero && seconds == o.seconds && transition == o.transition && fadeMs == o.fadeMs;
+    return leadingZero == o.leadingZero && seconds == o.seconds && transition == o.transition && fadeMs == o.fadeMs &&
+           tubeBrightness == o.tubeBrightness;
   }
 };
 constexpr long kFadeMinMs = 50;
 constexpr long kFadeMaxMs = 1000;
+/// The longest display object writeDisplayJson can produce, with room to spare.
+constexpr size_t kDisplayJsonBytes = 160;
 
 const char* fxTransitionName(FxTransition transition);
 bool parseFxTransition(const char* text, FxTransition& out);
+/// `a,b,c,d,e,f`: six whole numbers 0-100 (FW-FX-034, FW-FX-068). `out` is only written on success.
+bool parseTubeBrightness(const char* text, std::array<uint8_t, kTubes>& out);
 
 /// The options as a JSON object, with `hours` (FW-FX-030) when non-zero. `/display.json` leaves
 /// `hours` out: the hour format stays in the EEPROM blob (FW-FX-050). Returns the length, 0 if it
 /// does not fit.
 size_t writeDisplayJson(const DisplayOptions& options, int hours, char* out, size_t cap);
-/// `/display.json`. False when the text is not exactly what writeDisplayJson writes (FW-FX-052).
+/// `/display.json`. False when the text is not what writeDisplayJson writes (FW-FX-052); a file
+/// from before `tubeBrightness` existed is still read, with every tube at 100.
 bool parseDisplayJson(const char* json, size_t len, DisplayOptions& out);
 
 /// Blanks what the options hide (FW-FX-031, FW-FX-032). Not during a flash, which has to show on
 /// every tube (FW-ATT-002).
 void applyDisplayOptions(std::array<int8_t, kTubes>& digits, const DisplayOptions& options, bool attentionActive);
 
-/// Follows the digits and fades between them when asked to (FW-FX-033). A digit only ever changes
-/// because the digits given to update() did: nothing about colors reaches here (FW-DSP-025).
+/// Follows the digits and moves between them as the transition says (FW-FX-033). A digit only ever
+/// changes because the digits given to update() did: nothing about colors reaches here (FW-DSP-025).
 class DigitFader {
  public:
   void update(const std::array<int8_t, kTubes>& digits, uint32_t nowMs, const DisplayOptions& options);
-  /// Writes digit, fromDigit and mix of each tube.
+  /// Writes digit, fromDigit and mix of each tube: during a scramble or carry, the digit on its way.
   void fill(std::array<TubeState, kTubes>& tubes) const;
+  /// The digit the tube is meant to show, whatever a transition is showing on the way.
+  int8_t digit(int tube) const { return digit_[tube]; }
+  /// FW-FX-016: when the tube last changed to a digit (not to blank), after the first update.
+  bool lastChange(int tube, uint32_t& atMs) const {
+    atMs = startMs_[tube];
+    return changed_[tube];
+  }
 
  private:
   std::array<int8_t, kTubes> digit_{};
   std::array<int8_t, kTubes> from_{};
+  std::array<int8_t, kTubes> prev_{};   // the digit before the last change, for carry
+  std::array<int8_t, kTubes> shown_{};  // what a scramble or carry shows now
   std::array<uint8_t, kTubes> mix_{};
   std::array<uint32_t, kTubes> startMs_{};
+  std::array<bool, kTubes> changed_{};
   bool started_ = false;
 };
 
@@ -213,7 +285,8 @@ class DigitFader {
 /// What a frame showed, for the log and the tests.
 struct FrameInfo {
   std::array<Rgb, kTubes> colors{};
-  std::array<int8_t, kTubes> digits{};
+  std::array<int8_t, kTubes> digits{};  // what the time means; blank in the dark half of a blink
+  std::array<int8_t, kTubes> shown{};   // what the LEDs show: a scramble, carry or glyph on its way
   uint8_t brightness = 0;  // after pulse; the saved value during a flash
   bool lit = false;
   bool attention = false;
@@ -227,7 +300,7 @@ Frame composeFrame(const LedLayout& layout, const EffectEngine& engine, const At
 
 // ---- Presets (FW-FX-040..045) ----
 
-constexpr int kBuiltinPresetCount = 12;
+constexpr int kBuiltinPresetCount = 18;
 
 /// 1-24 chars of A-Z a-z 0-9 - _ and space (FW-FX-040).
 bool isValidPresetName(const char* name);

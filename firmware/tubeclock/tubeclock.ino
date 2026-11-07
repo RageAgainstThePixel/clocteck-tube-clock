@@ -415,7 +415,7 @@ void saveEffect() {
 }
 
 void saveDisplayOptions() {
-  char json[96];
+  char json[kDisplayJsonBytes];
   const size_t n = writeDisplayJson(displayOptions, 0, json, sizeof(json));
   if (!n || !writeFileAtomic(kDisplayFile, json, n)) Serial.println(F("[fx] /display.json not saved"));
 }
@@ -526,7 +526,7 @@ bool rewritePresets(const char* name, const char* json, size_t jsonLen, char* li
 // FW-DSP-006, FW-FX-075: digits are - when blank, colors are what the tubes get before brightness.
 void logShown(const FrameInfo& s) {
   char digits[kTubes + 1];
-  for (int t = 0; t < kTubes; t++) digits[t] = s.digits[t] == kBlank ? '-' : static_cast<char>('0' + s.digits[t]);
+  for (int t = 0; t < kTubes; t++) digits[t] = s.shown[t] == kBlank ? '-' : static_cast<char>('0' + s.shown[t]);
   digits[kTubes] = '\0';
   Serial.printf("[leds] lit=%d brightness=%u digits=%s tubes=", s.lit ? 1 : 0, s.brightness, digits);
   for (int t = 0; t < kTubes; t++) Serial.printf("%s#%02x%02x%02x", t ? "," : "", s.colors[t].r, s.colors[t].g, s.colors[t].b);
@@ -559,10 +559,11 @@ void updateDisplay() {
   (void)frame;
 #endif
 
-  // FW-FX-075: at once when the digits or a flash change; moving colors at most once a second.
+  // FW-FX-075: at once when the digits or a flash change; moving colors, and the digits a scramble,
+  // carry or glyph shows on the way, at most once a second.
   const FrameInfo& was = lastShown.info;
   const bool atOnce = !lastShown.valid || s.digits != was.digits || s.lit != was.lit || s.attention != was.attention;
-  const bool moved = s.brightness != was.brightness || s.colors != was.colors;
+  const bool moved = s.brightness != was.brightness || s.colors != was.colors || s.shown != was.shown;
   if (atOnce || (moved && nowMs - lastShown.atMs >= 1000)) {
     logShown(s);
     lastShown.info = s;
@@ -980,8 +981,11 @@ void handleDisplay() {
   if (!authorized()) return;
   if (server.method() == HTTP_POST) {
     // Named by the spec for v1.1: refused rather than silently ignored under FW-API-007.
-    if (server.hasArg("tubeBrightness") || server.hasArg("night")) return sendError(400, "tubeBrightness and night are not in this firmware yet");
+    if (server.hasArg("night")) return sendError(400, "night is not in this firmware yet");
     DisplayOptions next = displayOptions;
+    if (server.hasArg("tubeBrightness") && !parseTubeBrightness(server.arg("tubeBrightness").c_str(), next.tubeBrightness)) {
+      return sendError(400, "need tubeBrightness=a,b,c,d,e,f with each 0-100");  // FW-FX-034
+    }
     long v;
     if (server.hasArg("leadingZero")) {
       if (!argInt("leadingZero", 0, 1, v)) return sendError(400, "need leadingZero=0|1");
@@ -992,7 +996,7 @@ void handleDisplay() {
       next.seconds = v == 1;
     }
     if (server.hasArg("transition") && !parseFxTransition(server.arg("transition").c_str(), next.transition)) {
-      return sendError(400, "need transition=cut|crossfade");
+      return sendError(400, "need transition=cut|crossfade|scramble|carry");
     }
     if (server.hasArg("fadeMs")) {
       if (!argInt("fadeMs", kFadeMinMs, kFadeMaxMs, v)) return sendError(400, "need fadeMs=50-1000");
@@ -1004,7 +1008,7 @@ void handleDisplay() {
       saveDisplayOptions();
     }
   }
-  char json[96];
+  char json[kDisplayJsonBytes];
   writeDisplayJson(displayOptions, settings.is24Hour ? 24 : 12, json, sizeof(json));
   server.send(200, kJson, json);
 }

@@ -82,8 +82,19 @@ test('HOST-CLI-027 effect set sends only what was asked for', () => {
   );
   assert.deepEqual(effectBody('wave', { speed: '100' }), { pattern: 'wave', period: 600 });
   assert.throws(() => effectBody('wave', { speed: '10', period: '100' }), RangeError);
-  // v1.1 fields go along; the firmware's 400 says whether it has them.
-  assert.deepEqual(effectBody('chase', { density: '4', width: '2', count: '1', duty: '50' }), { pattern: 'chase', density: 4, width: 2, count: 1, duty: 50 });
+  // The v1.1 patterns' fields go along as numbers.
+  assert.deepEqual(effectBody('chase', { density: '4', seed: '9', width: '2', count: '1', duty: '50' }), { pattern: 'chase', density: 4, seed: 9, width: 2, count: 1, duty: 50 });
+  // FW-FX-016, FW-FX-017: accents and glyphs.
+  assert.deepEqual(effectBody('matrix', { glyphs: 'on', accent: 'flicker,600,tubes=hm,color=#ff8000,spread=80,strength=70' }), {
+    pattern: 'matrix',
+    glyphs: true,
+    accent: { style: 'flicker', ms: 600, tubes: 'hm', color: '#ff8000', spread: 80, strength: 70 },
+  });
+  assert.deepEqual(effectBody('wave', { accent: 'dip' }), { pattern: 'wave', accent: { style: 'dip' } });
+  assert.deepEqual(effectBody('wave', { accent: 'off' }), { pattern: 'wave', accent: null });
+  assert.throws(() => effectBody('wave', { accent: 'dip,400,500' }), RangeError);
+  assert.throws(() => effectBody('wave', { accent: 'dip,speed=3' }), RangeError);
+  assert.throws(() => effectBody('wave', { glyphs: 'yes' }), RangeError);
   // Not a number: sent as it came, for the firmware's 400 to name.
   assert.deepEqual(effectBody('wave', { period: 'soon' }), { pattern: 'wave', period: 'soon' });
 });

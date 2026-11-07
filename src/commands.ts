@@ -1,6 +1,6 @@
 // Pure pieces of the CLI, kept apart from cli.ts (which runs on import) so they can be unit-tested.
 import type { FirmwareKind } from './detect.js';
-import type { DisplayChange, Effect, TubeClockState } from './tubeclock.js';
+import type { DisplayChange, Effect, EffectAccent, TubeClockState } from './tubeclock.js';
 
 export const COMMANDS = [
   'status', 'color', 'brightness', 'mode', 'digits', 'hours', 'timezone', 'tz', 'time',
@@ -121,6 +121,31 @@ export function parsePulse(text: string): Effect['pulse'] {
   return { min: value(min), max: value(max), ...(period === undefined ? {} : { period: value(period) }) };
 }
 
+/**
+ * `--accent style[,ms][,key=value...]` or `--accent off` (FW-FX-016). Keys: tubes (all, hm or a mask
+ * like 110110), color, spread, strength.
+ */
+export function parseAccent(text: string): Effect['accent'] {
+  if (text === 'off') return null;
+  const [style, ...rest] = text.split(',').map((p) => p.trim());
+  if (!style) throw new RangeError('--accent is style[,ms][,tubes=..][,color=..][,spread=..][,strength=..] or off');
+  const accent: EffectAccent = { style };
+  for (const part of rest) {
+    const eq = part.indexOf('=');
+    if (eq < 0) {
+      if (accent.ms !== undefined) throw new RangeError(`--accent: "${part}" needs a key, such as tubes=${part}`);
+      accent.ms = numeric(part) as number;
+      continue;
+    }
+    const key = part.slice(0, eq);
+    const value = part.slice(eq + 1);
+    if (key === 'tubes' || key === 'color') accent[key] = value;
+    else if (key === 'spread' || key === 'strength' || key === 'ms') accent[key] = numeric(value) as number;
+    else throw new RangeError(`--accent: unknown key ${key} (tubes, color, spread, strength, ms)`);
+  }
+  return accent;
+}
+
 export interface EffectFlags {
   palette?: string;
   direction?: string;
@@ -134,12 +159,15 @@ export interface EffectFlags {
   width?: string;
   count?: string;
   duty?: string;
+  seed?: string;
+  glyphs?: string;
+  accent?: string;
 }
 
 /**
  * The body of `effect set` (HOST-CLI-027): only what was asked for, so the rest of the active effect
- * stays (FW-FX-061). density, width, count and duty are v1.1 fields; they go along anyway and the
- * firmware's `400` says whether it has them.
+ * stays (FW-FX-061). density, seed, width, count and duty belong to the sparkle, fire, chase and strobe
+ * patterns; firmware before them answers `400`.
  */
 export function effectBody(pattern: string, flags: EffectFlags): Effect {
   if (flags.speed !== undefined && flags.period !== undefined) throw new RangeError('--speed and --period set the same thing: use one');
@@ -152,10 +180,12 @@ export function effectBody(pattern: string, flags: EffectFlags): Effect {
   if (flags.drift !== undefined) body.drift = numeric(flags.drift) as number;
   if (flags.easing !== undefined) body.easing = flags.easing;
   if (flags.pulse !== undefined) body.pulse = parsePulse(flags.pulse);
-  for (const key of ['density', 'width', 'count', 'duty'] as const) {
+  for (const key of ['density', 'seed', 'width', 'count', 'duty'] as const) {
     const value = flags[key];
-    if (value !== undefined) body[key] = numeric(value);
+    if (value !== undefined) body[key] = numeric(value) as number;
   }
+  if (flags.glyphs !== undefined) body.glyphs = onOff(flags.glyphs, '--glyphs');
+  if (flags.accent !== undefined) body.accent = parseAccent(flags.accent);
   return body;
 }
 

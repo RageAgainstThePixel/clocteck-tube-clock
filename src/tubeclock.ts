@@ -62,9 +62,25 @@ export interface EffectPulse {
   easing?: string;
 }
 
+/** What a tube does when its digit changes (FW-FX-016). Missing fields keep their current value. */
+export interface EffectAccent {
+  /** flicker, flash, dip, glow or shift */
+  style?: string;
+  /** 50-3000 */
+  ms?: number;
+  /** A color, or null for the palette's last stop */
+  color?: string | null;
+  /** all, hm (hours and minutes) or six of 0/1, left to right */
+  tubes?: string;
+  /** Milliseconds per tube the accent takes to reach a neighbour, 0-1000 */
+  spread?: number;
+  /** 0-100 */
+  strength?: number;
+}
+
 /** An effect as the firmware takes it (FW-FX-001..008). The firmware's `400` says what it refused. */
 export interface Effect {
-  /** solid, tubes, wave, gradient or breathe */
+  /** solid, tubes, wave, gradient, breathe, sparkle, chase, fire, strobe or matrix */
   pattern?: string;
   /** `rainbow`, or 1-8 colors: a name, `#rrggbb`, `#rgb` or `h,s,v` */
   palette?: 'rainbow' | (string | PaletteStop)[];
@@ -81,6 +97,20 @@ export interface Effect {
   /** linear, sine, ease-in, ease-out, ease-in-out or step */
   easing?: string;
   pulse?: EffectPulse | null;
+  /** sparkle, fire and matrix: how busy, 1-100 */
+  density?: number;
+  /** sparkle, fire and matrix: which random sequence, 0-65535 */
+  seed?: number;
+  /** matrix: random digits while a drop passes */
+  glyphs?: boolean;
+  /** Any pattern: what a tube does when its digit changes; null for nothing */
+  accent?: EffectAccent | null;
+  /** chase: tubes per runner, 1-6 */
+  width?: number;
+  /** chase: runners, 1-6 */
+  count?: number;
+  /** strobe: percent of each period on the first color, 0-100 */
+  duty?: number;
   [key: string]: unknown;
 }
 
@@ -100,15 +130,16 @@ export interface DisplayOptions {
   hours: 12 | 24;
   leadingZero: boolean;
   seconds: boolean;
-  /** cut or crossfade */
+  /** cut, crossfade, scramble or carry */
   transition: string;
   /** 50-1000 */
   fadeMs: number;
+  /** Percent per tube, left to right (FW-FX-034); missing on firmware before it */
+  tubeBrightness?: number[];
 }
 
-/** A change of display options. `tubeBrightness` and `night` are for firmware that has them (FW-FX-034/035). */
+/** A change of display options. `night` is for firmware that has it (FW-FX-035). */
 export type DisplayChange = Partial<DisplayOptions> & {
-  tubeBrightness?: number[];
   /** `HH:MM,HH:MM,level` or `off` */
   night?: string;
 };

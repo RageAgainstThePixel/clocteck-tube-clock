@@ -93,11 +93,17 @@ clocteck [--host <ip>] [--token <t>] [--json] <command>
   effect                              Show the active effect
   effect set <pattern> [--palette c1,c2,...|rainbow] [--direction ltr|rtl|center|edges]
              [--period ms | --speed 1-100] [--phase 0-100] [--drift ms] [--easing e] [--pulse min,max[,ms]]
-                                      Change it; what you leave out stays
+             [--density 1-100] [--seed n] [--width 1-6] [--count 1-6] [--duty 0-100] [--glyphs on|off]
+             [--accent style[,ms][,tubes=all|hm|110110][,color=c][,spread=ms][,strength=0-100] | off]
+                                      Change it; what you leave out stays. Patterns: solid, tubes,
+                                      wave, gradient, breathe, sparkle, chase, fire, strobe, matrix.
+                                      An accent is what a tube does when its digit changes:
+                                      flicker, flash, dip, glow or shift
   effect json <file|->                Change it from raw JSON
   display [--hours 12|24] [--leading-zero on|off] [--seconds on|off]
-          [--transition cut|crossfade] [--fade ms]
-                                      What the digits do; no flags prints the options
+          [--transition cut|crossfade|scramble|carry] [--fade ms] [--tube-brightness a,b,c,d,e,f]
+                                      What the digits do; no flags prints the options.
+                                      --tube-brightness dims each tube, 0-100, left to right
 ```
 
 The CLI needs the API token: `--token`, else `$CLOCTECK_TOKEN`, else `$FW_API_TOKEN`. It doesn't read `.env` by itself; `node --env-file=.env dist/cli.js ...` uses the repo's. With `--firmware tubeclock` and no host given, the host is `tubeclock.local`.
@@ -113,6 +119,10 @@ clocteck --host tubeclock.local status
 clocteck --host tubeclock.local preset use ocean
 clocteck --host tubeclock.local color all "#ff6a00"
 clocteck --host tubeclock.local effect set wave --palette "#ff00ff,#00e5ff" --direction rtl --speed 60
+clocteck --host tubeclock.local effect set chase --palette "#000010,#00e5ff" --count 2 --period 3000
+clocteck --host tubeclock.local effect set wave --accent dip,300,spread=80
+clocteck --host tubeclock.local display --transition scramble --fade 400
+clocteck --host tubeclock.local display --tube-brightness 100,100,80,100,100,100
 clocteck --host tubeclock.local tz EST5EDT,M3.2.0,M11.1.0
 clocteck --host tubeclock.local attention orange --seconds 10 --blink
 ```

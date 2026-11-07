@@ -57,11 +57,18 @@ New firmware only:
   effect                              Show the active effect
   effect set <pattern> [--palette c1,c2,...|rainbow] [--direction ltr|rtl|center|edges]
              [--period ms | --speed 1-100] [--phase 0-100] [--drift ms] [--easing e] [--pulse min,max[,ms]]
-                                      Change the active effect; what you leave out stays
+             [--density 1-100] [--seed n] [--width 1-6] [--count 1-6] [--duty 0-100] [--glyphs on|off]
+             [--accent style[,ms][,tubes=all|hm|110110][,color=c][,spread=ms][,strength=0-100] | off]
+                                      Change the active effect; what you leave out stays.
+                                      Patterns: solid, tubes, wave, gradient, breathe,
+                                      sparkle, chase, fire, strobe, matrix.
+                                      Accents: flicker, flash, dip, glow, shift
   effect json <file|->                Change it from raw JSON
   display [--hours 12|24] [--leading-zero on|off] [--seconds on|off]
-          [--transition cut|crossfade] [--fade ms]
-                                      Change what the digits do; no flags prints the options
+          [--transition cut|crossfade|scramble|carry] [--fade ms] [--tube-brightness a,b,c,d,e,f]
+                                      Change what the digits do; no flags prints the options.
+                                      --fade is also how long a scramble or carry takes.
+                                      --tube-brightness: 0-100 per tube, left to right
 
 Options:
   --host <ip>       Clock address (default: $CLOCTECK_HOST, else ${DEFAULT_HOST},
@@ -100,6 +107,9 @@ const OPTIONS = {
     width: { type: 'string' },
     count: { type: 'string' },
     duty: { type: 'string' },
+    seed: { type: 'string' },
+    glyphs: { type: 'string' },
+    accent: { type: 'string' },
     hours: { type: 'string' },
     'leading-zero': { type: 'string' },
     transition: { type: 'string' },
@@ -350,11 +360,25 @@ function readEffect(path: string): Effect {
 function describeEffect(effect: Effect): string {
   const palette = Array.isArray(effect.palette) ? effect.palette.map((c) => (typeof c === 'string' ? c : `${c.color}@${c.at}`)).join(' ') : effect.palette;
   const pulse = effect.pulse ? `\nPulse      ${effect.pulse.min}..${effect.pulse.max} over ${effect.pulse.period} ms, ${effect.pulse.easing}` : '';
+  const own = [
+    effect.density !== undefined ? `density ${effect.density}` : '',
+    effect.seed !== undefined ? `seed ${effect.seed}` : '',
+    effect.width !== undefined ? `width ${effect.width}` : '',
+    effect.count !== undefined ? `${effect.count} runner${effect.count === 1 ? '' : 's'}` : '',
+    effect.duty !== undefined ? `duty ${effect.duty}%` : '',
+    effect.glyphs !== undefined ? `glyphs ${effect.glyphs ? 'on' : 'off'}` : '',
+  ].filter(Boolean);
+  const a = effect.accent;
+  const accent = a
+    ? `\nAccent     ${a.style} ${a.ms} ms on ${a.tubes} tubes${a.color ? `, ${a.color}` : ''}${a.spread ? `, spreads ${a.spread} ms per tube` : ''}${a.strength !== 100 ? `, strength ${a.strength}` : ''}`
+    : '';
   return (
     `Pattern    ${effect.pattern}${effect.preset ? ` (preset ${effect.preset})` : ''}\n` +
     `Palette    ${palette} (${effect.interpolate})\n` +
     `Motion     ${effect.drift ? `drift ${effect.drift} ms` : effect.direction}, period ${effect.period} ms, phase ${effect.phase}%, ${effect.easing}` +
-    pulse
+    (own.length ? `\nOptions    ${own.join(', ')}` : '') +
+    pulse +
+    accent
   );
 }
 
@@ -363,7 +387,8 @@ function describeDisplay(d: DisplayOptions): string {
     `Hours        ${d.hours}`,
     `Leading zero ${d.leadingZero ? 'on' : 'off'}`,
     `Seconds      ${d.seconds ? 'on' : 'off'}`,
-    `Transition   ${d.transition}${d.transition === 'crossfade' ? `, ${d.fadeMs} ms` : ''}`,
+    `Transition   ${d.transition}${d.transition === 'cut' ? '' : `, ${d.fadeMs} ms`}`,
+    ...(d.tubeBrightness ? [`Tube levels  ${d.tubeBrightness.map((v) => `${v}%`).join(' ')}`] : []),
   ].join('\n');
 }
 

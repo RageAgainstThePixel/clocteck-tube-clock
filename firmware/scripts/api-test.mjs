@@ -84,7 +84,7 @@ const restoreEffect = async () => {
   return send('PUT', '/api/effect', effect);
 };
 const restoreDisplay = () =>
-  req('POST', `/api/display?leadingZero=${beforeDisplay.leadingZero ? 1 : 0}&seconds=${beforeDisplay.seconds ? 1 : 0}&transition=${beforeDisplay.transition}&fadeMs=${beforeDisplay.fadeMs}`);
+  req('POST', `/api/display?leadingZero=${beforeDisplay.leadingZero ? 1 : 0}&seconds=${beforeDisplay.seconds ? 1 : 0}&transition=${beforeDisplay.transition}&fadeMs=${beforeDisplay.fadeMs}&tubeBrightness=${beforeDisplay.tubeBrightness.join(',')}`);
 r = await req('GET', '/api/state', {});
 check('FW-SEC-006 no token right after a valid one is still 401', r.status === 401, r.status);
 r = await req('GET', '/api/state', { Authorization: 'Bearer' });
@@ -192,7 +192,7 @@ console.log(`clock time: ${r.json?.time} (${r.json?.tz})`);
 
 // ---- Effects (VER-020) ----
 
-const fullEffect = (e) => ['pattern', 'palette', 'interpolate', 'direction', 'period', 'phase', 'drift', 'easing', 'pulse'].every((k) => k in (e ?? {}));
+const fullEffect = (e) => ['pattern', 'palette', 'interpolate', 'direction', 'period', 'phase', 'drift', 'easing', 'pulse', 'accent'].every((k) => k in (e ?? {}));
 const putEffect = (body) => send('PUT', '/api/effect', body);
 
 r = await req('GET', '/api/effect');
@@ -226,12 +226,43 @@ check('FW-FX-061 FW-FX-024 switching to breathe resets its own fields', r.json?.
 r = await req('GET', '/api/state');
 check('FW-FX-069 state carries effect.pattern', r.json?.effect?.pattern === 'breathe' && r.json?.preset === null, r.text);
 
+// FW-FX-009..012, FW-FX-025..028: the v1.1 patterns and their own fields.
+r = await putEffect({ pattern: 'sparkle', density: 55, seed: 7 });
+check('FW-FX-025 FW-FX-009 FW-FX-012 sparkle with density and seed', r.status === 200 && r.json?.pattern === 'sparkle' && r.json.density === 55 && r.json.seed === 7 && !('width' in r.json), r.text);
+r = await putEffect({ pattern: 'fire' });
+check('FW-FX-027 FW-FX-061 a switch to fire resets density and seed', r.status === 200 && r.json?.pattern === 'fire' && r.json.density === 20 && r.json.seed === 0, r.text);
+r = await putEffect({ pattern: 'chase', width: 2, count: 3 });
+check('FW-FX-026 FW-FX-010 chase with width and count', r.status === 200 && r.json?.width === 2 && r.json.count === 3 && !('density' in r.json), r.text);
+r = await putEffect({ period: 1500 });
+check('FW-FX-061 a partial body keeps width and count', r.status === 200 && r.json?.width === 2 && r.json.count === 3 && r.json.period === 1500, r.text);
+r = await putEffect({ pattern: 'strobe', duty: 20 });
+check('FW-FX-028 FW-FX-011 strobe with duty', r.status === 200 && r.json?.duty === 20 && !('width' in r.json), r.text);
+r = await putEffect({ pattern: 'matrix', glyphs: true, density: 40 });
+check('FW-FX-017 matrix with glyphs', r.status === 200 && r.json?.pattern === 'matrix' && r.json.glyphs === true && r.json.density === 40, r.text);
+r = await putEffect({ accent: { style: 'flicker', ms: 600, tubes: 'hm', spread: 80 } });
+check('FW-FX-016 an accent is set and answered whole', r.status === 200 && r.json?.accent?.style === 'flicker' && r.json.accent.ms === 600 && r.json.accent.tubes === 'hm' && r.json.accent.spread === 80 && r.json.accent.color === null && r.json.accent.strength === 100, r.text);
+r = await putEffect({ accent: { color: '#ff0000', tubes: '100001' } });
+check('FW-FX-016 a partial accent keeps the rest', r.status === 200 && r.json?.accent?.style === 'flicker' && r.json.accent.color === '#ff0000' && r.json.accent.tubes === '100001', r.text);
+r = await putEffect({ pattern: 'breathe' });
+check('FW-FX-060 the older patterns have none of the v1.1 fields', r.status === 200 && !['density', 'seed', 'width', 'count', 'duty', 'glyphs'].some((k) => k in r.json), r.text);
+check('FW-FX-016 the accent survives a pattern switch', r.json?.accent?.style === 'flicker', r.text);
+r = await putEffect({ accent: null });
+check('FW-FX-016 accent null removes it', r.status === 200 && r.json?.accent === null, r.text);
+
 // FW-FX-013, VER-020: every bad body is a 400 naming the field, and changes nothing.
 const unchanged = (await req('GET', '/api/effect')).text;
 for (const [name, body, field] of [
   ['unknown field', { pattern: 'wave', bogus: 1 }, 'unknown field'],
-  ['v1.1 field', { pattern: 'wave', density: 20 }, 'unknown field'],
-  ['v1.1 pattern', { pattern: 'fire' }, 'pattern'],
+  ['unknown pattern', { pattern: 'plasma' }, 'pattern'],
+  ['density 0', { density: 0 }, 'density'],
+  ['width 7', { width: 7 }, 'width'],
+  ['count 0', { count: 0 }, 'count'],
+  ['duty 101', { duty: 101 }, 'duty'],
+  ['seed 65536', { seed: 65536 }, 'seed'],
+  ['glyphs as a number', { glyphs: 1 }, 'glyphs'],
+  ['bad accent style', { accent: { style: 'wobble' } }, 'accent'],
+  ['accent ms 3001', { accent: { ms: 3001 } }, 'accent'],
+  ['accent tubes of five', { accent: { tubes: '11111' } }, 'accent'],
   ['bad palette entry', { palette: ['#ff0000', 'nope'] }, 'palette'],
   ['palette of the wrong type', { palette: 5 }, 'palette'],
   ['9-stop palette', { palette: Array(9).fill('#ff0000') }, 'palette'],
@@ -326,9 +357,9 @@ for (const p of await listPresets()) {
   if (!p.builtin && /^(mine|api-test)/i.test(p.name)) await req('DELETE', `/api/preset?name=${encodeURIComponent(p.name)}`);  // an earlier failed run
 }
 let presets = await listPresets();
-const BUILTIN = ['rainbow-wave', 'nixie', 'classic-blue', 'ocean', 'sunset', 'synthwave', 'aurora', 'lava', 'candy', 'ice', 'night', 'vaporwave'];
+const BUILTIN = ['rainbow-wave', 'nixie', 'classic-blue', 'ocean', 'sunset', 'synthwave', 'aurora', 'lava', 'candy', 'ice', 'night', 'vaporwave', 'fire', 'candle', 'christmas', 'matrix', 'cyberpunk', 'twinkle'];
 check('FW-FX-044 FW-FX-063 the built-in presets are listed', BUILTIN.every((n) => presets.some((p) => p.name === n && p.builtin === true && typeof p.pattern === 'string')), JSON.stringify(presets));
-check('FW-FX-001 no v1.1 preset yet', !presets.some((p) => ['fire', 'candle', 'police', 'matrix', 'cyberpunk', 'twinkle'].includes(p.name)), JSON.stringify(presets));
+check('FW-FX-044 the v1.1 presets list their patterns', ['fire:fire', 'candle:fire', 'christmas:strobe', 'matrix:matrix', 'cyberpunk:chase', 'twinkle:sparkle'].every((s) => { const [n, p] = s.split(':'); return presets.some((x) => x.name === n && x.pattern === p); }), JSON.stringify(presets));
 for (const name of BUILTIN) {
   r = await req('GET', `/api/preset?name=${name}`);
   check(`FW-FX-064 ${name} reads back whole`, r.status === 200 && fullEffect(r.json) && !('preset' in r.json), r.text);
@@ -431,7 +462,14 @@ r = await req('POST', '/api/display?transition=crossfade&fadeMs=300');
 check('FW-FX-033 FW-FX-068 transition and fadeMs round trip', r.status === 200 && r.json?.transition === 'crossfade' && r.json.fadeMs === 300, r.text);
 r = await req('GET', '/api/state');
 check('FW-FX-069 FW-API-041 state carries the display options', r.json?.display?.leadingZero === false && r.json.display.seconds === false && r.json.display.transition === 'crossfade' && [12, 24].includes(r.json.display.hours), r.text);
-for (const bad of ['fadeMs=20', 'fadeMs=1001', 'fadeMs=x', 'transition=scramble', 'leadingZero=2', 'seconds=yes', 'night=off', 'tubeBrightness=1,2,3,4,5,6']) {
+for (const transition of ['scramble', 'carry']) {
+  r = await req('POST', `/api/display?transition=${transition}`);
+  check(`FW-FX-033 transition ${transition} round trip`, r.status === 200 && r.json?.transition === transition && r.json.fadeMs === 300, r.text);
+}
+await req('POST', '/api/display?transition=crossfade');
+r = await req('POST', '/api/display?tubeBrightness=100,90,0,55,100,7');
+check('FW-FX-034 FW-FX-068 tubeBrightness round trip', r.status === 200 && JSON.stringify(r.json?.tubeBrightness) === '[100,90,0,55,100,7]' && r.json.fadeMs === 300, r.text);
+for (const bad of ['fadeMs=20', 'fadeMs=1001', 'fadeMs=x', 'transition=bounce', 'leadingZero=2', 'seconds=yes', 'night=off', 'tubeBrightness=1,2,3,4,5', 'tubeBrightness=1,2,3,4,5,101', 'tubeBrightness=a,b,c,d,e,f']) {
   r = await req('POST', `/api/display?${bad}`);
   check(`FW-FX-068 FW-API-002 ${bad} is 400`, r.status === 400 && typeof r.json?.error === 'string', `${r.status} ${r.text}`);
 }
@@ -527,7 +565,7 @@ await req('GET', '/api/state');
 // FW-FX-050, VER-020: what has to be there after a reboot.
 const persisted = { pattern: 'gradient', palette: ['#123456', '#654321'], period: 7777 };
 await send('PUT', '/api/preset?name=api-test-kept', { pattern: 'solid', palette: ['#abcdef'] });
-await req('POST', '/api/display?seconds=0&fadeMs=444');
+await req('POST', '/api/display?seconds=0&fadeMs=444&tubeBrightness=100,100,40,100,100,100');
 const kept = (await putEffect(persisted)).json;
 
 // FW-API-018 (VER-015): the clock reboots here (the emulator exits).
@@ -559,7 +597,7 @@ if (await backUp(60)) {
   r = await req('GET', '/api/preset?name=api-test-kept');
   check('FW-FX-050 FW-FX-042 user presets survive a restart', r.status === 200 && r.json?.palette?.[0] === '#abcdef', r.text);
   r = await req('GET', '/api/display');
-  check('FW-FX-050 display options survive a restart', r.json?.seconds === false && r.json.fadeMs === 444, r.text);
+  check('FW-FX-050 display options survive a restart', r.json?.seconds === false && r.json.fadeMs === 444 && r.json.tubeBrightness?.[2] === 40, r.text);
   const bootLog = emulatorLog();
   if (bootLog) {
     const at = (text) => bootLog.indexOf(text);
