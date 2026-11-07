@@ -747,7 +747,7 @@ static void testEffectParse() {
   Effect e;
   CHECK(parseFx("{\"pattern\":\"wave\"}", nullptr, e) == FxError::kNone);  // FW-FX-001 every other field has a default
   CHECK(e.pattern == FxPattern::kWave && e.stopCount == 1 && !e.rainbow);
-  CHECK((e.stops[0].color == Rgb{0xff, 0xa0, 0x30}));                               // FW-FX-002 nixie amber
+  CHECK((e.stops[0].color == Rgb{0xff, 0x18, 0x00}));                               // FW-FX-002 nixie neon orange
   CHECK(e.interpolate == FxInterpolate::kHsv && e.direction == FxDirection::kLtr);  // FW-FX-003, FW-FX-004
   CHECK(e.period == 18000 && e.phase == 8 && e.easing == FxEasing::kLinear);        // FW-FX-005..007
   CHECK(!e.hasPulse);                                                               // FW-FX-008

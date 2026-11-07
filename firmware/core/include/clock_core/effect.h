@@ -68,7 +68,7 @@ struct Effect {
   bool hasPulse = false;
   FxPulse pulse;
 
-  /// The defaults for a pattern: nixie amber, and for `breathe` a sine swing over 32..255 (FW-FX-024).
+  /// The defaults for a pattern: nixie neon orange, and for `breathe` a sine swing over 32..255 (FW-FX-024).
   static Effect defaults(FxPattern pattern);
 
   bool operator==(const Effect& o) const;

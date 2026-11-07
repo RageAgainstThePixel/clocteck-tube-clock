@@ -386,7 +386,7 @@ const char kNameRainbowWave[] PROGMEM = "rainbow-wave";
 const char kJsonRainbowWave[] PROGMEM =
     R"({"pattern":"wave","palette":["#ff2030","#d04c00","#807000","#00bc00","#00a8a8","#3070ff","#a838ff","#ff08e0"],"interpolate":"rgb","direction":"ltr","period":18000,"phase":8})";
 const char kNameNixie[] PROGMEM = "nixie";
-const char kJsonNixie[] PROGMEM = R"({"pattern":"solid","palette":["#ffa030"]})";
+const char kJsonNixie[] PROGMEM = R"({"pattern":"solid","palette":["#ff1800"]})";
 const char kNameClassicBlue[] PROGMEM = "classic-blue";
 const char kJsonClassicBlue[] PROGMEM =
     R"({"pattern":"tubes","palette":["241,100,100","241,100,100","241,100,100","241,100,100","241,100,100","241,100,100"]})";
@@ -442,7 +442,7 @@ char lower(char c) { return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + '
 Effect Effect::defaults(FxPattern pattern) {
   Effect e;
   e.pattern = pattern;
-  e.stops[0].color = {0xff, 0xa0, 0x30};  // FW-FX-002 nixie amber
+  e.stops[0].color = {0xff, 0x18, 0x00};  // FW-FX-002 nixie neon orange
   if (pattern == FxPattern::kBreathe) {   // FW-FX-024
     e.easing = FxEasing::kSine;
     e.hasPulse = true;

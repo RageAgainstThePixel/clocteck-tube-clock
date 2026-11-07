@@ -28,7 +28,7 @@ An effect is one JSON object. Every field has a default, so `{"pattern":"wave"}`
 | ID | Field | Rule | Status |
 |---|---|---|---|
 | FW-FX-001 | `pattern` | One of the patterns in §2. Required. | v1. Done |
-| FW-FX-002 | `palette` | Either the string `"rainbow"` (the full hue wheel, saturation 100) or an array of 1–8 colors. A color is `"#rrggbb"`, `"#rgb"`, `"h,s,v"` or a name from the shared table (HOST-LIB-020). Default `["#ffa030"]` (nixie amber). A gradient stop MAY be written as `{"at": 0-100, "color": ...}`; without `at`, stops are evenly spaced with the last wrapping to the first. | v1. Done. The colors are kept and answered as `#rrggbb`; with a mix of placed and unplaced stops an unplaced one takes its even place, and places must not decrease (`400`). |
+| FW-FX-002 | `palette` | Either the string `"rainbow"` (the full hue wheel, saturation 100) or an array of 1–8 colors. A color is `"#rrggbb"`, `"#rgb"`, `"h,s,v"` or a name from the shared table (HOST-LIB-020). Default `["#ff1800"]` (nixie neon orange). A gradient stop MAY be written as `{"at": 0-100, "color": ...}`; without `at`, stops are evenly spaced with the last wrapping to the first. | v1. Done. The colors are kept and answered as `#rrggbb`; with a mix of placed and unplaced stops an unplaced one takes its even place, and places must not decrease (`400`). |
 | FW-FX-003 | `interpolate` | `hsv` (default, shortest hue path) or `rgb`. How colors between stops are mixed. | v1. Done |
 | FW-FX-004 | `direction` | `ltr` (default), `rtl`, `center` (starts at tubes 3–4 and moves outward), `edges` (starts at tubes 1 and 6 and moves inward). Defines each tube's *distance* `d(i)`: `ltr` 0..5, `rtl` 5..0, `center` 2.5,1.5,0.5,0.5,1.5,2.5, `edges` the reverse. | v1. Done |
 | FW-FX-005 | `period` | Milliseconds for one full cycle of the pattern on one tube, 100–600000, default 18000. `0` means static (no motion) where a pattern allows it. The only time parameter (OQ-23, decided); any `speed` is CLI sugar. | v1. Done |
@@ -92,7 +92,7 @@ A preset is a named effect. Built-in presets are JSON in PROGMEM; user presets a
 | Name | Pattern | Palette | Notes | Needs |
 |---|---|---|---|---|
 | `rainbow-wave` | wave | `#ff2030 #d04c00 #807000 #00bc00 #00a8a8 #3070ff #a838ff #ff08e0` | rgb, ltr, period 18 s, phase 8. Even brightness, so blue doesn't read as a blink. **Default** (OQ-22, decided). | v1 |
-| `nixie` | solid | `#ffa030` | The warm amber of a real nixie. | v1 |
+| `nixie` | solid | `#ff1800` | The neon orange-red of a real nixie, with no blue. | v1 |
 | `classic-blue` | tubes | `241,100,100` ×6 | Today's firmware default. | v1 |
 | `ocean` | wave | `#101a78@0 #3c10a8@20 #0a48d0@35 #00a8b8@45 #0a48d0@55 #2a18a0@70 #1040c0@80 #101a78@90` | rgb, ltr, period 5 s, phase 25, pulse 170–255 / 7 s. Uneven ripples and a swell. | v1 |
 | `sunset` | solid | `#ffc000 #ff8000 #ff4000 #ff0000 #ff4000 #ff8000` | period 96 s: one color across, 16 s per stop. | v1 |
