@@ -103,6 +103,12 @@ export interface Effect {
   seed?: number;
   /** matrix: random digits while a drop passes */
   glyphs?: boolean;
+  /** sparkle: ms a flash takes to fade back, 50-3000 (default 250) */
+  fade?: number;
+  /** sparkle: percent of a flash that reaches each neighbouring tube, 0-100 */
+  splash?: number;
+  /** sparkle: ms a splash on a neighbouring tube takes to fade, 50-3000 (default 250) */
+  splashFade?: number;
   /** Any pattern: what a tube does when its digit changes; null for nothing */
   accent?: EffectAccent | null;
   /** chase: tubes per runner, 1-6 */

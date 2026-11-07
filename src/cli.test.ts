@@ -38,7 +38,20 @@ function answer(req: SeenRequest): FakeReply {
   }
   if (req.path === '/api/display') return { body: sampleDisplay(req.query.get('seconds') === '0' ? { seconds: false } : {}) };
   const tz = req.query.get('tz');
-  return { body: sampleState(tz ? { tz } : req.path === '/api/attention' ? { attention: req.method === 'POST' } : {}) };
+  return { body: sampleState({ ...stateExtra, ...(tz ? { tz } : req.path === '/api/attention' ? { attention: req.method === 'POST' } : {}) }) };
+}
+
+let stateExtra: Record<string, unknown> = {};
+
+async function clocteckStatus(extra: Record<string, unknown>): Promise<string> {
+  stateExtra = extra;
+  try {
+    const { code, stdout } = await run(['status']);
+    assert.equal(code, 0);
+    return stdout;
+  } finally {
+    stateExtra = {};
+  }
 }
 
 before(async () => {
@@ -72,6 +85,15 @@ test('HOST-CLI-010 status on the new firmware: --json prints the state unchanged
   const { code, stdout } = await run(['status', '--json']);
   assert.equal(code, 0);
   assert.deepEqual(JSON.parse(stdout), sampleState());
+});
+
+test('HOST-CLI-010 status lists the saved tube colors only under the tubes pattern', async () => {
+  const wave = await clocteckStatus({ effect: { pattern: 'wave' }, preset: 'rainbow-wave' });
+  assert.match(wave, /Effect +wave \(preset rainbow-wave\)/);
+  assert.doesNotMatch(wave, /Tubes|#0400ff/);
+  const tubes = await clocteckStatus({ effect: { pattern: 'tubes' }, preset: null });
+  assert.match(tubes, /Tubes\n  1  #0400ff/);
+  assert.match(await clocteckStatus({}), /Tubes\n  1  #0400ff/);  // firmware from before effects
 });
 
 test('HOST-CLI-011 color all is one /api/tube request; value is ignored', async () => {

@@ -229,8 +229,11 @@ check('FW-FX-069 state carries effect.pattern', r.json?.effect?.pattern === 'bre
 // FW-FX-009..012, FW-FX-025..028: the v1.1 patterns and their own fields.
 r = await putEffect({ pattern: 'sparkle', density: 55, seed: 7 });
 check('FW-FX-025 FW-FX-009 FW-FX-012 sparkle with density and seed', r.status === 200 && r.json?.pattern === 'sparkle' && r.json.density === 55 && r.json.seed === 7 && !('width' in r.json), r.text);
+check('FW-FX-018 sparkle answers its default fade and splash', r.json?.fade === 250 && r.json?.splash === 0 && r.json?.splashFade === 250, r.text);
+r = await putEffect({ fade: 1500, splash: 50, splashFade: 300 });
+check('FW-FX-018 sparkle with fade and splash', r.status === 200 && r.json?.fade === 1500 && r.json.splash === 50 && r.json.splashFade === 300 && r.json.density === 55, r.text);
 r = await putEffect({ pattern: 'fire' });
-check('FW-FX-027 FW-FX-061 a switch to fire resets density and seed', r.status === 200 && r.json?.pattern === 'fire' && r.json.density === 20 && r.json.seed === 0, r.text);
+check('FW-FX-027 FW-FX-061 a switch to fire resets density and seed', r.status === 200 && r.json?.pattern === 'fire' && r.json.density === 20 && r.json.seed === 0 && !('fade' in r.json) && !('splash' in r.json), r.text);
 r = await putEffect({ pattern: 'chase', width: 2, count: 3 });
 check('FW-FX-026 FW-FX-010 chase with width and count', r.status === 200 && r.json?.width === 2 && r.json.count === 3 && !('density' in r.json), r.text);
 r = await putEffect({ period: 1500 });
@@ -244,7 +247,7 @@ check('FW-FX-016 an accent is set and answered whole', r.status === 200 && r.jso
 r = await putEffect({ accent: { color: '#ff0000', tubes: '100001' } });
 check('FW-FX-016 a partial accent keeps the rest', r.status === 200 && r.json?.accent?.style === 'flicker' && r.json.accent.color === '#ff0000' && r.json.accent.tubes === '100001', r.text);
 r = await putEffect({ pattern: 'breathe' });
-check('FW-FX-060 the older patterns have none of the v1.1 fields', r.status === 200 && !['density', 'seed', 'width', 'count', 'duty', 'glyphs'].some((k) => k in r.json), r.text);
+check('FW-FX-060 the older patterns have none of the v1.1 fields', r.status === 200 && !['density', 'seed', 'width', 'count', 'duty', 'glyphs', 'fade', 'splash', 'splashFade'].some((k) => k in r.json), r.text);
 check('FW-FX-016 the accent survives a pattern switch', r.json?.accent?.style === 'flicker', r.text);
 r = await putEffect({ accent: null });
 check('FW-FX-016 accent null removes it', r.status === 200 && r.json?.accent === null, r.text);
@@ -260,6 +263,9 @@ for (const [name, body, field] of [
   ['duty 101', { duty: 101 }, 'duty'],
   ['seed 65536', { seed: 65536 }, 'seed'],
   ['glyphs as a number', { glyphs: 1 }, 'glyphs'],
+  ['fade 3001', { fade: 3001 }, 'fade'],
+  ['splash 101', { splash: 101 }, 'splash'],
+  ['splashFade 49', { splashFade: 49 }, 'splashFade'],
   ['bad accent style', { accent: { style: 'wobble' } }, 'accent'],
   ['accent ms 3001', { accent: { ms: 3001 } }, 'accent'],
   ['accent tubes of five', { accent: { tubes: '11111' } }, 'accent'],
@@ -357,7 +363,7 @@ for (const p of await listPresets()) {
   if (!p.builtin && /^(mine|api-test)/i.test(p.name)) await req('DELETE', `/api/preset?name=${encodeURIComponent(p.name)}`);  // an earlier failed run
 }
 let presets = await listPresets();
-const BUILTIN = ['rainbow-wave', 'nixie', 'classic-blue', 'ocean', 'sunset', 'synthwave', 'aurora', 'lava', 'candy', 'ice', 'night', 'vaporwave', 'fire', 'candle', 'christmas', 'matrix', 'cyberpunk', 'twinkle'];
+const BUILTIN = ['rainbow-wave', 'nixie', 'classic-blue', 'ocean', 'sunset', 'synthwave', 'aurora', 'lava', 'candy', 'ice', 'night', 'vaporwave', 'fire', 'candle', 'christmas', 'matrix', 'cyberpunk', 'twinkle', 'rain'];
 check('FW-FX-044 FW-FX-063 the built-in presets are listed', BUILTIN.every((n) => presets.some((p) => p.name === n && p.builtin === true && typeof p.pattern === 'string')), JSON.stringify(presets));
 check('FW-FX-044 the v1.1 presets list their patterns', ['fire:fire', 'candle:fire', 'christmas:strobe', 'matrix:matrix', 'cyberpunk:chase', 'twinkle:sparkle'].every((s) => { const [n, p] = s.split(':'); return presets.some((x) => x.name === n && x.pattern === p); }), JSON.stringify(presets));
 for (const name of BUILTIN) {

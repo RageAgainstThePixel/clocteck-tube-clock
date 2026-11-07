@@ -94,6 +94,7 @@ clocteck [--host <ip>] [--token <t>] [--json] <command>
   effect set <pattern> [--palette c1,c2,...|rainbow] [--direction ltr|rtl|center|edges]
              [--period ms | --speed 1-100] [--phase 0-100] [--drift ms] [--easing e] [--pulse min,max[,ms]]
              [--density 1-100] [--seed n] [--width 1-6] [--count 1-6] [--duty 0-100] [--glyphs on|off]
+             [--fade 50-3000] [--splash 0-100] [--splash-fade 50-3000]
              [--accent style[,ms][,tubes=all|hm|110110][,color=c][,spread=ms][,strength=0-100] | off]
                                       Change it; what you leave out stays. Patterns: solid, tubes,
                                       wave, gradient, breathe, sparkle, chase, fire, strobe, matrix.

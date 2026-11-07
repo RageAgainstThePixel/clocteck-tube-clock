@@ -60,6 +60,8 @@ constexpr uint8_t kAccentHmTubes = 0x0F;   // hours and minutes
 constexpr uint32_t kAccentMinMs = 50;
 constexpr uint32_t kAccentMaxMs = 3000;
 constexpr uint32_t kAccentMaxSpreadMs = 1000;
+constexpr uint32_t kSparkleMinFadeMs = 50;    // FW-FX-018
+constexpr uint32_t kSparkleMaxFadeMs = 3000;
 
 struct FxAccent {
   FxAccentStyle style = FxAccentStyle::kGlow;
@@ -96,6 +98,9 @@ struct Effect {
   uint8_t duty = 50;     // FW-FX-011: strobe, percent of a period on the first color
   uint16_t seed = 0;     // FW-FX-012: sparkle, fire and matrix, which random sequence
   bool glyphs = false;   // FW-FX-017: matrix, random digits while a drop passes
+  uint16_t fade = 250;   // FW-FX-018: sparkle, ms a flash takes to fade back to the base
+  uint8_t splash = 0;    // FW-FX-018: sparkle, percent of a flash that reaches each neighbour
+  uint16_t splashFade = 250;  // FW-FX-018: sparkle, ms the splash on a neighbour takes to fade
   bool hasAccent = false;
   FxAccent accent;  // FW-FX-016
 
@@ -134,6 +139,9 @@ enum class FxError : uint8_t {
   kSeed,
   kGlyphs,
   kAccent,
+  kFade,
+  kSplash,
+  kSplashFade,
 };
 
 /// The message for a 400 answer. It names the field and the valid form and never echoes the request
@@ -201,6 +209,7 @@ class EffectEngine {
   Rgb lookup(uint32_t pos16) const;
   Rgb eased(uint16_t pos16) const;
   Rgb sparkle(int tube, uint64_t tMs) const;
+  int sparkleFlash(int tube, uint64_t tMs, uint32_t fade, Rgb& flash) const;
   Rgb chase(int tube, uint32_t cycle) const;
   Rgb fire(int tube, uint64_t tMs) const;
   Rgb strobe(int tube, uint32_t cycle) const;
@@ -300,7 +309,7 @@ Frame composeFrame(const LedLayout& layout, const EffectEngine& engine, const At
 
 // ---- Presets (FW-FX-040..045) ----
 
-constexpr int kBuiltinPresetCount = 18;
+constexpr int kBuiltinPresetCount = 19;
 
 /// 1-24 chars of A-Z a-z 0-9 - _ and space (FW-FX-040).
 bool isValidPresetName(const char* name);

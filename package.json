@@ -1,6 +1,6 @@
 {
   "name": "clocteck-tube-clock",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Custom firmware with an on-device MCP server, CLI and TypeScript library for the ClocTeck CT-001 RGB tube clock",
   "private": true,
   "license": "MIT",

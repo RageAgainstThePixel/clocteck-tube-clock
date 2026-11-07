@@ -786,6 +786,11 @@ static void testEffectParse() {
       {"{\"pattern\":\"sparkle\",\"seed\":65536}", FxError::kSeed, "seed"},  // FW-FX-012
       {"{\"pattern\":\"sparkle\",\"seed\":-1}", FxError::kSeed, "seed"},
       {"{\"pattern\":\"matrix\",\"glyphs\":1}", FxError::kGlyphs, "glyphs"},  // FW-FX-017
+      {"{\"pattern\":\"sparkle\",\"fade\":49}", FxError::kFade, "fade"},      // FW-FX-018
+      {"{\"pattern\":\"sparkle\",\"fade\":3001}", FxError::kFade, "fade"},
+      {"{\"pattern\":\"sparkle\",\"splash\":101}", FxError::kSplash, "splash"},
+      {"{\"pattern\":\"sparkle\",\"splash\":true}", FxError::kSplash, "splash"},
+      {"{\"pattern\":\"sparkle\",\"splashFade\":49}", FxError::kSplashFade, "splashFade"},
       {"{\"pattern\":\"wave\",\"accent\":5}", FxError::kAccent, "accent"},    // FW-FX-016
       {"{\"pattern\":\"wave\",\"accent\":{\"style\":\"wobble\"}}", FxError::kAccent, "accent"},
       {"{\"pattern\":\"wave\",\"accent\":{\"ms\":49}}", FxError::kAccent, "accent"},
@@ -885,9 +890,9 @@ static void testEffectParse() {
   }
   // The largest v1.1 effect still fits the buffers, accent and all.
   std::string bigChase = big;
-  bigChase.replace(bigChase.find("gradient"), 8, "matrix");
+  bigChase.replace(bigChase.find("gradient"), 8, "sparkle");
   bigChase.insert(bigChase.size() - 1,
-                  ",\"density\":100,\"seed\":65535,\"glyphs\":false,"
+                  ",\"density\":100,\"seed\":65535,\"fade\":3000,\"splash\":100,\"splashFade\":3000,"
                   "\"accent\":{\"style\":\"flicker\",\"ms\":3000,\"color\":\"#ffffff\",\"tubes\":\"110110\",\"spread\":1000,\"strength\":100}");
   CHECK(bigChase.size() <= kFxMaxBodyBytes && parseFx(bigChase, nullptr, e) == FxError::kNone);
   const size_t bigLen = writeEffectJson(e, json, sizeof(json), true, "a preset name of 24 char");
@@ -917,6 +922,13 @@ static void testEffectParse() {
   accLen = writeEffectJson(acc, json, sizeof(json), false, nullptr);
   CHECK(std::string(json, accLen).find("\"density\":20,\"seed\":0,\"glyphs\":true") != std::string::npos);
   CHECK(parseFx("{\"pattern\":\"fire\"}", &acc, accNext) == FxError::kNone && !accNext.glyphs);
+  // FW-FX-018: fade and splash belong to sparkle; a switch resets them.
+  CHECK(parseFx("{\"pattern\":\"sparkle\",\"fade\":2000,\"splash\":40}", nullptr, acc) == FxError::kNone);
+  accLen = writeEffectJson(acc, json, sizeof(json), false, nullptr);
+  CHECK(std::string(json, accLen).find("\"density\":20,\"seed\":0,\"fade\":2000,\"splash\":40") != std::string::npos);
+  CHECK(parseFx(std::string(json, accLen), nullptr, accNext) == FxError::kNone && accNext == acc);
+  CHECK(parseFx("{\"pattern\":\"fire\"}", &acc, accNext) == FxError::kNone && accNext.fade == 250 && accNext.splash == 0 && accNext.splashFade == 250);
+  CHECK(std::string(json, writeEffectJson(accNext, json, sizeof(json), false, nullptr)).find("fade") == std::string::npos);
 
   // FW-FX-061: a partial body keeps the rest; a pattern switch resets the pattern's own fields.
   Effect base;
@@ -1143,6 +1155,59 @@ static void testEffectPatterns() {
     CHECK(b.r <= a.r || a.r == 0);  // FW-FX-025 one color: off between flashes
   }
 
+  // FW-FX-018: `fade` sets how long a flash lasts, and a long one carries into later slots.
+  auto longestFlash = [&](const std::string& json) {
+    EffectEngine fx = engineFor(json);
+    uint32_t longest = 0, run = 0;
+    for (uint64_t t = 0; t < 60000; t += 10) {
+      run = fx.tubeColor(1, t).r ? run + 10 : 0;
+      if (run > longest) longest = run;
+    }
+    return longest;
+  };
+  const uint32_t quick = longestFlash("{\"pattern\":\"sparkle\",\"palette\":[\"#ffffff\"],\"density\":5}");
+  const uint32_t slow = longestFlash("{\"pattern\":\"sparkle\",\"palette\":[\"#ffffff\"],\"density\":5,\"fade\":2000}");
+  CHECK(quick > 150 && quick <= 250);
+  CHECK(slow > 1500 && slow < 4000);
+  // The default fade looks exactly as before `fade` existed: one flash per slot, 250 ms.
+  EffectEngine plain = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#101030\",\"#ffffff\"],\"density\":60}");
+  EffectEngine same = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#101030\",\"#ffffff\"],\"density\":60,\"fade\":250,\"splash\":0}");
+  for (uint64_t t = 0; t < 20000; t += 30) CHECK(plain.tubeColor(3, t) == same.tubeColor(3, t));
+
+  // FW-FX-018: `splash` lights the neighbours of a flashing tube, weaker and a moment later; without
+  // it a tube only ever flashes on its own.
+  EffectEngine wet = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#000000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"density\":3,\"fade\":1000,\"splash\":50}");
+  EffectEngine dry = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#000000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"density\":3,\"fade\":1000}");
+  int splashed = 0;
+  for (uint64_t t = 100; t < 60000; t += 20) {
+    for (int i = 0; i < kTubes; i++) {
+      const Rgb w = wet.tubeColor(i, t), d = dry.tubeColor(i, t);
+      CHECK(w.b >= d.b);  // a splash only adds
+      if (w.b > d.b) {
+        splashed++;
+        // the light came from a neighbour's own flash 80 ms earlier, at no more than half its strength
+        uint8_t from = 0;
+        if (i > 0) from = std::max(from, dry.tubeColor(i - 1, t - 80).b);
+        if (i + 1 < kTubes) from = std::max(from, dry.tubeColor(i + 1, t - 80).b);
+        CHECK(w.b <= from / 2 + 2);
+      }
+    }
+  }
+  CHECK(splashed > 0);
+  // The splash fades over `splashFade`, on its own clock: a quick splash beside a slow drop.
+  EffectEngine quickSplash = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#000000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"density\":3,\"fade\":2000,\"splash\":100,\"splashFade\":300}");
+  EffectEngine slowSplash = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#000000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"density\":3,\"fade\":2000,\"splash\":100,\"splashFade\":2000}");
+  EffectEngine drops = engineFor("{\"pattern\":\"sparkle\",\"palette\":[\"#000000\",\"#0000ff\"],\"interpolate\":\"rgb\",\"density\":3,\"fade\":2000}");
+  int quickLit = 0, slowLit = 0;
+  for (uint64_t t = 100; t < 60000; t += 20) {
+    for (int i = 0; i < kTubes; i++) {
+      const uint8_t own = drops.tubeColor(i, t).b;
+      if (quickSplash.tubeColor(i, t).b > own) quickLit++;
+      if (slowSplash.tubeColor(i, t).b > own) slowLit++;
+    }
+  }
+  CHECK(quickLit > 0 && slowLit > quickLit * 3);
+
   // FW-FX-026: chase. One runner, ltr, a 6 s lap: tube i is fully lit about i s in, and the tube ahead
   // is still on the base.
   EffectEngine chase = engineFor("{\"pattern\":\"chase\",\"palette\":[\"#000000\",\"#ffffff\"],\"interpolate\":\"rgb\",\"period\":6000}");
@@ -1239,7 +1304,7 @@ static void testEffectPatterns() {
 static void testPresets() {
   const char* const names[kBuiltinPresetCount] = {"rainbow-wave", "nixie", "classic-blue", "ocean", "sunset", "synthwave",
                                                   "aurora", "lava", "candy", "ice", "night", "vaporwave",
-                                                  "fire", "candle", "christmas", "matrix", "cyberpunk", "twinkle"};
+                                                  "fire", "candle", "christmas", "matrix", "cyberpunk", "twinkle", "rain"};
   size_t total = 0;
   for (int i = 0; i < kBuiltinPresetCount; i++) {
     char name[kPresetNameMax + 1];
@@ -1298,7 +1363,9 @@ static void testPresets() {
   CHECK(loadBuiltinPreset(findBuiltinPreset("cyberpunk"), e));
   CHECK(e.pattern == FxPattern::kChase && e.period == 2000 && e.count == 1 && e.width == 2);
   CHECK(loadBuiltinPreset(findBuiltinPreset("twinkle"), e));
-  CHECK(e.pattern == FxPattern::kSparkle && e.density == 30 && e.stopCount == 3);
+  CHECK(e.pattern == FxPattern::kSparkle && e.density == 30 && e.stopCount == 3 && e.fade == 250 && e.splash == 0 && e.splashFade == 250);
+  CHECK(loadBuiltinPreset(findBuiltinPreset("rain"), e));
+  CHECK(e.pattern == FxPattern::kSparkle && e.density == 10 && e.fade == 1500 && e.splash == 80 && e.splashFade == 300 && e.stopCount == 2);  // FW-FX-018
 
   CHECK(isValidPresetName("My preset_1-b"));  // FW-FX-040
   CHECK(isValidPresetName("a"));

@@ -58,7 +58,10 @@ const char kFxErrors[] PROGMEM =
     "duty: need 0-100\0"
     "seed: need 0-65535\0"
     "glyphs: need true or false\0"
-    "accent: need null or {style, ms 50-3000, color, tubes, spread, strength}\0";
+    "accent: need null or {style, ms 50-3000, color, tubes, spread, strength}\0"
+    "fade: need 50-3000\0"
+    "splash: need 0-100\0"
+    "splashFade: need 50-3000\0";
 
 const char* const kPatternNames[] = {"solid", "tubes", "wave", "gradient", "breathe", "sparkle", "chase", "fire", "strobe", "matrix"};
 const char* const kAccentStyleNames[] = {"flicker", "flash", "dip", "glow", "shift"};
@@ -100,6 +103,9 @@ void resetPatternFields(Effect& e, FxPattern pattern) {
   e.duty = fresh.duty;
   e.seed = fresh.seed;
   e.glyphs = fresh.glyphs;
+  e.fade = fresh.fade;
+  e.splash = fresh.splash;
+  e.splashFade = fresh.splashFade;
   e.pattern = pattern;
 }
 
@@ -293,7 +299,7 @@ FxError parseImpl(const char* json, size_t len, const Effect* base, Effect& out,
                        kv.key() == "direction" || kv.key() == "period" || kv.key() == "phase" ||
                        kv.key() == "drift" || kv.key() == "easing" || kv.key() == "pulse" || kv.key() == "density" ||
                        kv.key() == "width" || kv.key() == "count" || kv.key() == "duty" || kv.key() == "seed" ||
-                       kv.key() == "glyphs" || kv.key() == "accent" || (preset && kv.key() == "preset");
+                       kv.key() == "glyphs" || kv.key() == "fade" || kv.key() == "splash" || kv.key() == "splashFade" || kv.key() == "accent" || (preset && kv.key() == "preset");
     if (!known) return FxError::kUnknownField;
   }
 
@@ -382,6 +388,21 @@ FxError parseImpl(const char* json, size_t len, const Effect* base, Effect& out,
   if (!v.isUnbound()) {
     if (!v.is<bool>()) return FxError::kGlyphs;
     e.glyphs = v.as<bool>();
+  }
+  v = root["fade"];
+  if (!v.isUnbound()) {
+    if (!readSmall(v, kSparkleMinFadeMs, kSparkleMaxFadeMs, n)) return FxError::kFade;
+    e.fade = static_cast<uint16_t>(n);
+  }
+  v = root["splash"];
+  if (!v.isUnbound()) {
+    if (!readSmall(v, 0, 100, n)) return FxError::kSplash;
+    e.splash = static_cast<uint8_t>(n);
+  }
+  v = root["splashFade"];
+  if (!v.isUnbound()) {
+    if (!readSmall(v, kSparkleMinFadeMs, kSparkleMaxFadeMs, n)) return FxError::kSplashFade;
+    e.splashFade = static_cast<uint16_t>(n);
   }
   v = root["accent"];
   if (!v.isUnbound()) {
@@ -567,6 +588,9 @@ const char kJsonCyberpunk[] PROGMEM =
     R"({"pattern":"chase","palette":["#ff00a0","#fcee0a","#00f0ff"],"interpolate":"rgb","direction":"ltr","period":2000,"width":2,"count":1})";
 const char kNameTwinkle[] PROGMEM = "twinkle";
 const char kJsonTwinkle[] PROGMEM = R"({"pattern":"sparkle","palette":["#1c38b0","#ffffff","#a0c8ff"],"interpolate":"rgb","density":30})";
+const char kNameRain[] PROGMEM = "rain";
+const char kJsonRain[] PROGMEM =
+    R"({"pattern":"sparkle","palette":["#008a00","#0050ff"],"interpolate":"rgb","density":10,"fade":1500,"splash":80,"splashFade":300})";
 
 struct BuiltinPreset {
   const char* name;
@@ -580,6 +604,7 @@ const BuiltinPreset kBuiltins[kBuiltinPresetCount] PROGMEM = {
     {kNameIce, kJsonIce},                 {kNameNight, kJsonNight},   {kNameVaporwave, kJsonVaporwave},
     {kNameFire, kJsonFire},               {kNameCandle, kJsonCandle}, {kNameChristmas, kJsonChristmas},
     {kNameMatrix, kJsonMatrix},           {kNameCyberpunk, kJsonCyberpunk}, {kNameTwinkle, kJsonTwinkle},
+    {kNameRain, kJsonRain},
 };
 
 BuiltinPreset builtinAt(int index) {
@@ -611,7 +636,7 @@ bool Effect::operator==(const Effect& o) const {
   if (pattern != o.pattern || rainbow != o.rainbow || stopCount != o.stopCount || interpolate != o.interpolate ||
       direction != o.direction || period != o.period || phase != o.phase || drift != o.drift || easing != o.easing ||
       hasPulse != o.hasPulse || (hasPulse && !(pulse == o.pulse)) || density != o.density || width != o.width ||
-      count != o.count || duty != o.duty || seed != o.seed || glyphs != o.glyphs || hasAccent != o.hasAccent ||
+      count != o.count || duty != o.duty || seed != o.seed || glyphs != o.glyphs || fade != o.fade || splash != o.splash || splashFade != o.splashFade || hasAccent != o.hasAccent ||
       (hasAccent && !(accent == o.accent))) {
     return false;
   }
@@ -708,6 +733,13 @@ size_t writeEffectJson(const Effect& e, char* out, size_t cap, bool withPreset, 
     if (e.pattern == FxPattern::kMatrix) {
       j.key("glyphs");
       j.str(e.glyphs ? "true" : "false");
+    } else if (e.pattern == FxPattern::kSparkle) {
+      j.key("fade");
+      j.num(e.fade);
+      j.key("splash");
+      j.num(e.splash);
+      j.key("splashFade");
+      j.num(e.splashFade);
     }
   } else if (e.pattern == FxPattern::kChase) {
     j.key("width");
@@ -870,7 +902,8 @@ uint32_t valueNoise(uint32_t seed, uint32_t lane, uint64_t tMs, uint32_t spacing
 
 constexpr Rgb kOff{0, 0, 0};
 constexpr uint32_t kSparkleSlotMs = 400;   // FW-FX-025: at most one flash per tube in each slot
-constexpr uint32_t kSparkleFlashMs = 250;  // a flash's fade back to the base
+constexpr uint32_t kSparkleFlashMs = 250;  // the default fade; a flash starts in the slot's first 150 ms
+constexpr uint32_t kSplashDelayMs = 80;    // FW-FX-018: how much later a splash reaches the next tube
 constexpr int kChaseTailUnits = 384;       // FW-FX-026: a runner's fading tail, 1.5 tubes
 
 // `f` of 0..256 of the way from a to b.
@@ -878,21 +911,53 @@ Rgb blend256(const Rgb& a, const Rgb& b, int f, FxInterpolate how) { return f >=
 
 }  // namespace
 
-// FW-FX-025: with one color the base is off and the flashes are that color.
+// FW-FX-025: with one color the base is off and the flashes are that color. FW-FX-018: with `splash`
+// a flash also reaches the tubes on either side, `splash` percent as strong, a moment later, and
+// fading over `splashFade` so the splash can be quicker than the drop.
 Rgb EffectEngine::sparkle(int tube, uint64_t tMs) const {
   const Effect& e = effect_;
   const Rgb base = e.stopCount > 1 ? e.stops[0].color : kOff;
+  Rgb flash = base;
+  int best = sparkleFlash(tube, tMs, e.fade, flash);
+  if (e.splash && tMs >= kSplashDelayMs) {
+    for (int side = -1; side <= 1; side += 2) {
+      const int from = tube + side;
+      if (from < 0 || from >= kTubes) continue;
+      Rgb theirs = base;
+      const int amount = sparkleFlash(from, tMs - kSplashDelayMs, e.splashFade, theirs) * e.splash / 100;
+      if (amount <= best) continue;
+      best = amount;
+      flash = theirs;
+    }
+  }
+  return best ? blend256(base, flash, best, e.interpolate) : base;
+}
+
+// How far into its flash a tube is, 0..256 (0 for none), and the flash's color, for a flash that
+// fades over `fade` ms: the tube's own `fade`, or `splashFade` for what reaches its neighbours.
+int EffectEngine::sparkleFlash(int tube, uint64_t tMs, uint32_t fade, Rgb& flash) const {
+  const Effect& e = effect_;
   // Each tube's slots start at their own time, so flashes don't line up across the clock.
   const uint64_t shifted = tMs + hash3(e.seed, static_cast<uint32_t>(tube), 0xFFFFFFFFu) % kSparkleSlotMs;
   const uint32_t slot = static_cast<uint32_t>(shifted / kSparkleSlotMs);
   const uint32_t within = static_cast<uint32_t>(shifted % kSparkleSlotMs);
-  const uint32_t h = hash3(e.seed, static_cast<uint32_t>(tube), slot);
-  if ((h & 0xFF) >= e.density * 256u / 100u) return base;  // density 100 flashes in every slot
-  const uint32_t start = (h >> 8) % (kSparkleSlotMs - kSparkleFlashMs + 1);
-  if (within < start || within >= start + kSparkleFlashMs) return base;
-  const Rgb flash = e.stopCount > 1 ? e.stops[1 + (h >> 20) % (e.stopCount - 1)].color : e.stops[0].color;
-  const int left = static_cast<int>(kSparkleFlashMs - (within - start)) * 256 / static_cast<int>(kSparkleFlashMs);
-  return blend256(base, flash, left * left / 256, e.interpolate);  // bright at once, then a quick fade
+  // FW-FX-018: a flash starts in the first 150 ms of its slot and fades over `fade` ms, so a long fade
+  // reaches into later slots; the brightest flash still fading wins.
+  const uint32_t lookBack = (kSparkleSlotMs - kSparkleFlashMs + fade) / kSparkleSlotMs;
+  int best = 0;
+  for (uint32_t back = 0; back <= lookBack && back <= slot; back++) {
+    const uint32_t h = hash3(e.seed, static_cast<uint32_t>(tube), slot - back);
+    if ((h & 0xFF) >= e.density * 256u / 100u) continue;  // density 100 flashes in every slot
+    const uint32_t start = (h >> 8) % (kSparkleSlotMs - kSparkleFlashMs + 1);
+    const uint32_t at = within + back * kSparkleSlotMs;
+    if (at < start || at >= start + fade) continue;
+    const int left = static_cast<int>(fade - (at - start)) * 256 / static_cast<int>(fade);
+    const int amount = left * left / 256;  // bright at once, then a fade
+    if (amount <= best) continue;
+    best = amount;
+    flash = e.stopCount > 1 ? e.stops[1 + (h >> 20) % (e.stopCount - 1)].color : e.stops[0].color;
+  }
+  return best;
 }
 
 // FW-FX-026: `count` runners, evenly spaced, one lap per period. Each fades in over half a tube as it

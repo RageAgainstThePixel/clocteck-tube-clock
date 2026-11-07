@@ -161,13 +161,16 @@ export interface EffectFlags {
   duty?: string;
   seed?: string;
   glyphs?: string;
+  fade?: string;
+  splash?: string;
+  'splash-fade'?: string;
   accent?: string;
 }
 
 /**
  * The body of `effect set` (HOST-CLI-027): only what was asked for, so the rest of the active effect
  * stays (FW-FX-061). density, seed, width, count and duty belong to the sparkle, fire, chase and strobe
- * patterns; firmware before them answers `400`.
+ * patterns, fade, splash and splash-fade to sparkle (FW-FX-018); firmware before them answers `400`.
  */
 export function effectBody(pattern: string, flags: EffectFlags): Effect {
   if (flags.speed !== undefined && flags.period !== undefined) throw new RangeError('--speed and --period set the same thing: use one');
@@ -180,10 +183,11 @@ export function effectBody(pattern: string, flags: EffectFlags): Effect {
   if (flags.drift !== undefined) body.drift = numeric(flags.drift) as number;
   if (flags.easing !== undefined) body.easing = flags.easing;
   if (flags.pulse !== undefined) body.pulse = parsePulse(flags.pulse);
-  for (const key of ['density', 'seed', 'width', 'count', 'duty'] as const) {
+  for (const key of ['density', 'seed', 'width', 'count', 'duty', 'fade', 'splash'] as const) {
     const value = flags[key];
     if (value !== undefined) body[key] = numeric(value) as number;
   }
+  if (flags['splash-fade'] !== undefined) body.splashFade = numeric(flags['splash-fade']) as number;
   if (flags.glyphs !== undefined) body.glyphs = onOff(flags.glyphs, '--glyphs');
   if (flags.accent !== undefined) body.accent = parseAccent(flags.accent);
   return body;

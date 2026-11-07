@@ -58,10 +58,14 @@ New firmware only:
   effect set <pattern> [--palette c1,c2,...|rainbow] [--direction ltr|rtl|center|edges]
              [--period ms | --speed 1-100] [--phase 0-100] [--drift ms] [--easing e] [--pulse min,max[,ms]]
              [--density 1-100] [--seed n] [--width 1-6] [--count 1-6] [--duty 0-100] [--glyphs on|off]
+             [--fade 50-3000] [--splash 0-100] [--splash-fade 50-3000]
              [--accent style[,ms][,tubes=all|hm|110110][,color=c][,spread=ms][,strength=0-100] | off]
                                       Change the active effect; what you leave out stays.
                                       Patterns: solid, tubes, wave, gradient, breathe,
                                       sparkle, chase, fire, strobe, matrix.
+                                      --fade, --splash, --splash-fade: sparkle's fade (ms),
+                                      how much of a flash reaches the next tubes, and
+                                      how fast that splash fades (ms).
                                       Accents: flicker, flash, dip, glow, shift
   effect json <file|->                Change it from raw JSON
   display [--hours 12|24] [--leading-zero on|off] [--seconds on|off]
@@ -109,6 +113,8 @@ const OPTIONS = {
     duty: { type: 'string' },
     seed: { type: 'string' },
     glyphs: { type: 'string' },
+    splash: { type: 'string' },
+    'splash-fade': { type: 'string' },
     accent: { type: 'string' },
     hours: { type: 'string' },
     'leading-zero': { type: 'string' },
@@ -337,6 +343,9 @@ function describeState(host: string, state: TubeClockState): string {
   ];
   if (state.effect) lines.push(`Effect     ${state.effect.pattern}${state.preset ? ` (preset ${state.preset})` : ''}`);
   if (state.timeSource) lines.push(`Source     ${state.timeSource}${state.lastSync ? `, last NTP sync ${state.lastSync}` : ''}`);
+  // HOST-CLI-010: the saved per-tube colors are only what the clock shows under the `tubes` pattern
+  // (or on firmware from before effects); otherwise they would read as the current colors.
+  if (state.effect && state.effect.pattern !== 'tubes') return lines.join('\n');
   lines.push('Tubes', ...state.tubes.map((t, i) => `  ${i + 1}  ${hsvToHex({ h: t.h, s: t.s, v: 100 })}  (h ${t.h}, s ${t.s})`));
   return lines.join('\n');
 }
@@ -366,6 +375,8 @@ function describeEffect(effect: Effect): string {
     effect.count !== undefined ? `${effect.count} runner${effect.count === 1 ? '' : 's'}` : '',
     effect.duty !== undefined ? `duty ${effect.duty}%` : '',
     effect.glyphs !== undefined ? `glyphs ${effect.glyphs ? 'on' : 'off'}` : '',
+    effect.fade !== undefined ? `fade ${effect.fade} ms` : '',
+    effect.splash ? `splash ${effect.splash}% fading over ${effect.splashFade ?? 250} ms` : '',
   ].filter(Boolean);
   const a = effect.accent;
   const accent = a

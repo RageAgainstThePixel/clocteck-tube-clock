@@ -50,7 +50,7 @@ const DEFAULT_DURATION_SECONDS = 5;
 const MAX_DURATION_SECONDS = 30;
 
 function createServer(caller: string): McpServer {
-  const server = new McpServer({ name: 'clocteck-tube-clock', version: '0.2.0' });
+  const server = new McpServer({ name: 'clocteck-tube-clock', version: '0.3.0' });
 
   server.registerTool(
     'get_attention',

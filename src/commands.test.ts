@@ -84,6 +84,7 @@ test('HOST-CLI-027 effect set sends only what was asked for', () => {
   assert.throws(() => effectBody('wave', { speed: '10', period: '100' }), RangeError);
   // The v1.1 patterns' fields go along as numbers.
   assert.deepEqual(effectBody('chase', { density: '4', seed: '9', width: '2', count: '1', duty: '50' }), { pattern: 'chase', density: 4, seed: 9, width: 2, count: 1, duty: 50 });
+  assert.deepEqual(effectBody('sparkle', { fade: '1500', splash: '50', 'splash-fade': '300' }), { pattern: 'sparkle', fade: 1500, splash: 50, splashFade: 300 });  // FW-FX-018
   // FW-FX-016, FW-FX-017: accents and glyphs.
   assert.deepEqual(effectBody('matrix', { glyphs: 'on', accent: 'flicker,600,tubes=hm,color=#ff8000,spread=80,strength=70' }), {
     pattern: 'matrix',
