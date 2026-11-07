@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11">
+  <style>
+    .board { fill: #2f8f5b; stroke: #1c5c3a; stroke-width: 2; }
+    .pad { fill: #3ea86d; stroke: #1c5c3a; stroke-width: 1; }
+    .led { fill: #f4f4f4; stroke: #777; stroke-width: 0.8; }
+    .part { fill: #222; stroke: #000; }
+    .conn { fill: #c0c0c0; stroke: #555; }
+    .th { fill: #e8c25a; stroke: #7a5c00; }
+    .th1 { fill: #e8c25a; stroke: #000; stroke-width: 1.5; }
+    .hole { fill: #111; }
+    .lbl { fill: #fff; }
+    .note { fill: #333; }
+    .title { fill: #000; font-size: 14px; font-weight: 600; }
+    .edge { fill: #444; font-size: 10px; font-style: italic; }
+  </style>
+
+  <!-- ================= LED side ================= -->
+  <text class="title" x="60" y="22">LED side (faces the tubes), viewed from above. Left = silkscreen end (LED1), right = button end (LED60).</text>
+  <text class="edge" x="60" y="40">front edge (inferred: opposite the buttons / USB-C)</text>
+  <text class="edge" x="60" y="222">rear edge: buttons, USB-C and JP1 are on this edge (their through-hole pins show here)</text>
+
+  <rect class="board" x="60" y="48" width="1080" height="160" rx="6"/>
+  <!-- tube pads: the board widens under each tube -->
+  <g id="tubepads">
+    <rect class="pad" x="62"  y="52" width="130" height="152" rx="4"/>
+    <rect class="pad" x="243" y="52" width="130" height="152" rx="4"/>
+    <rect class="pad" x="438" y="52" width="130" height="152" rx="4"/>
+    <rect class="pad" x="621" y="52" width="130" height="152" rx="4"/>
+    <rect class="pad" x="816" y="52" width="130" height="152" rx="4"/>
+    <rect class="pad" x="999" y="52" width="130" height="152" rx="4"/>
+  </g>
+
+  <!-- one tube block: odd row (LED n+0..n+8) nearer the LED1 end, even row offset toward the LED60 end;
+       within a row LED n is nearest the front edge, LED n+8 nearest the rear edge (inferred from silkscreen) -->
+  <defs>
+    <g id="tube">
+      <circle class="led" cx="0"  cy="0"  r="6"/>
+      <circle class="led" cx="0"  cy="20" r="6"/>
+      <circle class="led" cx="0"  cy="40" r="6"/>
+      <circle class="led" cx="0"  cy="60" r="6"/>
+      <circle class="led" cx="0"  cy="80" r="6"/>
+      <circle class="led" cx="26" cy="10" r="6"/>
+      <circle class="led" cx="26" cy="30" r="6"/>
+      <circle class="led" cx="26" cy="50" r="6"/>
+      <circle class="led" cx="26" cy="70" r="6"/>
+      <circle class="led" cx="26" cy="90" r="6"/>
+    </g>
+  </defs>
+  <use href="#tube" x="112" y="80"/>
+  <use href="#tube" x="293" y="80"/>
+  <use href="#tube" x="488" y="80"/>
+  <use href="#tube" x="671" y="80"/>
+  <use href="#tube" x="866" y="80"/>
+  <use href="#tube" x="1049" y="80"/>
+
+  <!-- block labels -->
+  <g class="lbl" text-anchor="middle">
+    <text x="127" y="66">T1  LED1–10</text>
+    <text x="308" y="66">T2  LED11–20</text>
+    <text x="503" y="66">T3  LED21–30</text>
+    <text x="686" y="66">T4  LED31–40</text>
+    <text x="881" y="66">T5  LED41–50</text>
+    <text x="1064" y="66">T6  LED51–60</text>
+    <text x="127" y="196" font-size="9">WSC5 / WSC1</text>
+    <text x="308" y="196" font-size="9">WSC6 / WSC2</text>
+    <text x="503" y="196" font-size="9">WSC7 / WSC3</text>
+    <text x="686" y="196" font-size="9">WSC8 / WSC4</text>
+    <text x="881" y="196" font-size="9">WSC13 / WSC14?</text>
+    <text x="1064" y="196" font-size="9">WSC15 / WSC16</text>
+  </g>
+  <!-- row labels on T1 only -->
+  <g class="lbl" font-size="9">
+    <text x="92" y="84">1</text>
+    <text x="92" y="164">9</text>
+    <text x="150" y="94">2</text>
+    <text x="150" y="174">10</text>
+  </g>
+
+  <!-- through-hole pins that show on the LED side -->
+  <g class="th">
+    <!-- coin cell holder tabs between T2 and T3 -->
+    <rect x="398" y="118" width="10" height="8"/>
+    <rect x="414" y="118" width="10" height="8"/>
+    <!-- JP1 ×6 between T3 and T4, rear edge -->
+    <circle cx="586" cy="188" r="3"/><circle cx="594" cy="188" r="3"/><circle cx="602" cy="188" r="3"/>
+    <circle cx="610" cy="188" r="3"/><circle cx="618" cy="188" r="3"/><circle cx="626" cy="188" r="3"/>
+    <!-- USB-C shell tabs beside T4, rear edge -->
+    <rect x="706" y="196" width="8" height="8"/><rect x="726" y="196" width="8" height="8"/>
+    <!-- buzzer pins between T5 and T6 -->
+    <circle cx="985" cy="110" r="3"/><circle cx="995" cy="110" r="3"/>
+    <!-- button pins ×8 along rear edge beside T5/T6 -->
+    <circle cx="900" cy="196" r="3"/><circle cx="916" cy="196" r="3"/>
+    <circle cx="936" cy="196" r="3"/><circle cx="952" cy="196" r="3"/>
+    <circle cx="972" cy="196" r="3"/><circle cx="988" cy="196" r="3"/>
+    <circle cx="1008" cy="196" r="3"/><circle cx="1024" cy="196" r="3"/>
+  </g>
+  <rect class="hole" x="950" y="150" width="60" height="18"/>
+  <g class="note" font-size="9">
+    <text x="384" y="112">BT1 tabs</text>
+    <text x="580" y="178">JP1 pins</text>
+    <text x="700" y="192" text-anchor="end">USB-C tabs</text>
+    <text x="1000" y="105">buzzer</text>
+    <text x="955" y="146">slot</text>
+    <text x="900" y="182">button pins</text>
+  </g>
+  <!-- mounting holes -->
+  <circle class="hole" cx="72" cy="60" r="4"/><circle class="hole" cx="72" cy="196" r="4"/>
+  <circle class="hole" cx="1128" cy="60" r="4"/><circle class="hole" cx="1128" cy="196" r="4"/>
+
+  <!-- ================= Back side ================= -->
+  <text class="title" x="60" y="268">Back side (components), viewed from the back. Same left/right as above; the rear edge is now at the top.</text>
+  <text class="edge" x="60" y="286">rear edge: buttons, USB-C, JP1</text>
+  <text class="edge" x="60" y="466">front edge: PCB antenna U4 sits on this edge</text>
+
+  <rect class="board" x="60" y="292" width="1080" height="160" rx="6"/>
+  <g class="pad">
+    <rect x="62"  y="296" width="130" height="152" rx="4"/>
+    <rect x="243" y="296" width="130" height="152" rx="4"/>
+    <rect x="438" y="296" width="130" height="152" rx="4"/>
+    <rect x="621" y="296" width="130" height="152" rx="4"/>
+    <rect x="816" y="296" width="130" height="152" rx="4"/>
+    <rect x="999" y="296" width="130" height="152" rx="4"/>
+  </g>
+
+  <!-- silkscreen end -->
+  <g class="lbl" font-size="9">
+    <text x="78" y="330">Nixie Clock V4.5.1</text>
+    <text x="78" y="342">Powered By ClocTeck.com</text>
+    <text x="78" y="354">C6TUBE0083</text>
+  </g>
+  <!-- caps near the end -->
+  <g class="part">
+    <rect x="210" y="330" width="10" height="5"/><rect x="210" y="340" width="10" height="5"/>
+    <rect x="210" y="350" width="10" height="5"/><rect x="210" y="360" width="10" height="5"/>
+  </g>
+  <text class="lbl" x="224" y="350" font-size="9">5VC4 C10 C11 5VC3</text>
+
+  <!-- coin cell -->
+  <circle cx="406" cy="372" r="22" fill="#c9b27c" stroke="#5a4a1e"/>
+  <text class="note" x="406" y="376" text-anchor="middle" font-size="9">CR1220</text>
+  <text class="lbl" x="406" y="410" text-anchor="middle" font-size="9">BT1 (designator unread)</text>
+
+  <!-- JP1 header, pin 1 (square) nearest the USB-C / button end -->
+  <g>
+    <rect x="565" y="298" width="66" height="22" fill="none" stroke="#fff" stroke-width="1"/>
+    <circle class="th" cx="574" cy="309" r="4"/><circle class="th" cx="584" cy="309" r="4"/>
+    <circle class="th" cx="594" cy="309" r="4"/><circle class="th" cx="604" cy="309" r="4"/>
+    <circle class="th" cx="614" cy="309" r="4"/>
+    <rect class="th1" x="620" y="305" width="8" height="8"/>
+    <text class="lbl" x="598" y="334" text-anchor="middle" font-size="9">JP1 (6-pin, unpopulated)</text>
+    <text class="lbl" x="628" y="346" text-anchor="middle" font-size="9">pin 1 ■</text>
+    <text class="lbl" x="598" y="358" text-anchor="middle" font-size="8">pins 6→1: GND, ?, GPIO0, TX, RX, 5 V</text>
+  </g>
+
+  <!-- RTC block -->
+  <rect class="part" x="585" y="372" width="26" height="16"/>
+  <text class="lbl" x="598" y="400" text-anchor="middle" font-size="9">GC1307 RTC (I²C, DS1307-compatible)</text>
+  <rect class="conn" x="620" y="372" width="10" height="20"/>
+  <text class="lbl" x="625" y="404" text-anchor="middle" font-size="9">X2 32.768k</text>
+  <text class="lbl" x="598" y="416" text-anchor="middle" font-size="8">DSC3 DSC4 DSR1 DSR2 DSR3 5VC6 5VC7</text>
+
+  <!-- USB-C -->
+  <rect class="conn" x="705" y="296" width="30" height="14" rx="3"/>
+  <text class="lbl" x="720" y="322" text-anchor="middle" font-size="9">USB2 (USB-C)</text>
+  <text class="lbl" x="676" y="334" text-anchor="middle" font-size="8">CCR1 CCR2 (5.1k)</text>
+
+  <!-- ESP8285, crystal, antenna, LDO, caps -->
+  <rect class="part" x="780" y="356" width="28" height="28"/>
+  <text class="lbl" x="794" y="396" text-anchor="middle" font-size="9">U1 ESP8285</text>
+  <rect class="conn" x="784" y="340" width="14" height="10"/>
+  <text class="lbl" x="812" y="348" font-size="8">X1 26.000 MHz, 10pF ×2, 12K</text>
+  <path d="M770 430 h50 v8 h-10 v-6 h-10 v6 h-10 v-6 h-10 v6 h-10 z" fill="#d9b86b" stroke="#5a4a1e"/>
+  <text class="lbl" x="826" y="440" font-size="9">U4 PCB antenna</text>
+  <rect class="part" x="752" y="366" width="12" height="9"/>
+  <text class="lbl" x="748" y="374" text-anchor="end" font-size="8">3-leg "V4XC" regulator</text>
+  <g class="part">
+    <rect x="736" y="322" width="10" height="5"/><rect x="736" y="330" width="10" height="5"/><rect x="736" y="338" width="10" height="5"/>
+    <rect x="736" y="396" width="10" height="5"/><rect x="736" y="404" width="10" height="5"/><rect x="736" y="412" width="10" height="5"/>
+  </g>
+  <text class="lbl" x="750" y="334" font-size="8">C ×3</text>
+  <text class="lbl" x="750" y="408" font-size="8">C ×3</text>
+  <text class="lbl" x="812" y="364" font-size="8">R13, DSR4, 10UF</text>
+
+  <!-- buzzer and transistor -->
+  <circle cx="989" cy="372" r="16" fill="#111" stroke="#000"/>
+  <text class="lbl" x="989" y="400" text-anchor="middle" font-size="9">BUZZER2</text>
+  <rect class="part" x="1012" y="356" width="10" height="7"/>
+  <text class="lbl" x="1026" y="362" font-size="8">Y1 (SOT-23), 1k, 5VC5</text>
+
+  <!-- buttons along the rear edge -->
+  <g class="conn">
+    <rect x="896" y="296" width="18" height="12"/><rect x="930" y="296" width="18" height="12"/>
+    <rect x="964" y="296" width="18" height="12"/><rect x="998" y="296" width="18" height="12"/>
+  </g>
+  <text class="lbl" x="956" y="322" text-anchor="middle" font-size="9">buttons 1–4: GPIO 0, 2, 9, 16, low pressed</text>
+  <rect class="hole" x="950" y="330" width="60" height="18"/>
+  <text class="lbl" x="1014" y="343" font-size="8">slot</text>
+  <text class="lbl" x="870" y="334" text-anchor="end" font-size="8">R1–R4 5.1k ×4</text>
+
+  <circle class="hole" cx="72" cy="304" r="4"/><circle class="hole" cx="72" cy="440" r="4"/>
+  <circle class="hole" cx="1128" cy="304" r="4"/><circle class="hole" cx="1128" cy="440" r="4"/>
+
+  <!-- legend -->
+  <g class="note" font-size="10">
+    <circle class="led" cx="70" cy="500" r="6"/><text x="82" y="504">WS2812-style LED</text>
+    <rect class="th" x="190" y="494" width="10" height="10"/><text x="206" y="504">through-hole pad</text>
+    <rect class="th1" x="330" y="494" width="10" height="10"/><text x="346" y="504">JP1 pin 1 (square pad)</text>
+    <rect class="part" x="490" y="495" width="12" height="8"/><text x="508" y="504">SMD part</text>
+    <rect class="hole" x="590" y="495" width="12" height="8"/><text x="608" y="504">hole / slot</text>
+    <text x="60" y="530">Positions are scaled from photos, not measured. Designators ending in "?" were not legible. JP1 pin 5 ("?") is unidentified. Measured pins are in hardware.md.</text>
+    <text x="60" y="548">Back side is the mirror of the LED side along the board's length: a part at the rear edge on one side is at the rear edge on the other.</text>
+  </g>
+</svg>

@@ -1,0 +1,50 @@
+{
+  "name": "clocteck-tube-clock",
+  "version": "0.1.0",
+  "description": "Custom firmware with an on-device MCP server, CLI and TypeScript library for the ClocTeck CT-001 RGB tube clock",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "clocteck": "dist/cli.js",
+    "clocteck-mcp": "dist/mcp.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"dist/**/*.test.js\"",
+    "clocteck": "node dist/cli.js",
+    "mcp": "node dist/mcp.js",
+    "fw:build": "wsl -d Ubuntu-24.04 -- sh firmware/scripts/build.sh",
+    "fw:emulate": "wsl -d Ubuntu-24.04 -- sh firmware/scripts/emulate.sh",
+    "fw:api-test": "node firmware/scripts/api-test.mjs",
+    "fw:mcp-test": "node firmware/scripts/mcp-test.mjs",
+    "fw:ota": "node firmware/scripts/ota.mjs",
+    "fw:backup": "node firmware/scripts/backup.mjs",
+    "fw:flash": "node firmware/scripts/flash.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@types/node": "^24.19.2",
+    "esptool-js": "0.7.1",
+    "serialport": "13.0.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+firmware/build/
+*.log
+.env
+.env.*
+firmware/tubeclock/secrets.h
+# Firmware images: a whole-flash backup holds the Wi-Fi password in plain text
+*.bin
+*.bin.sha256
+# Firmware backups and a saved copy of the stock /admin page (vendor code, reference only)
+clock/
+docs/multimeter-guide.md
