@@ -1,6 +1,6 @@
 # clocteck-tube-clock
 
-[![M8ven Score](https://m8ven.ai/badge/mcp/rageagainstthepixel-clocteck-tube-clock-17n0tc?v=4128f74ec9dd434eb4cf376b3601c4dd)](https://m8ven.ai/mcp/rageagainstthepixel-clocteck-tube-clock-17n0tc?s=readme)
+[![M8ven Score](https://m8ven.ai/badge/mcp/rageagainstthepixel/clocteck-tube-clock)](https://m8ven.ai/mcp/rageagainstthepixel/clocteck-tube-clock?s=readme)
 
 Custom firmware with an on-device MCP server, CLI and TypeScript library for the **ClocTeck CT-001 RGB tube clock** (FCC ID 2BGKQ-CT001, made by Ningbo Qianjie Electronic Technology, board "Nixie Clock V4.5.1"). There's no app or cloud service involved: everything runs over your local network.
 
