@@ -31,7 +31,10 @@ export interface TubeClockState {
   timeSource?: 'ntp' | 'rtc' | 'none';
   ip?: string;
   rssi?: number;
+  /** Whole seconds since the clock started (FW-API-038) */
   uptimeS?: number;
+  /** Why the chip last started, in the ESP8266 core's words, e.g. "Power On", "Exception" (FW-API-038) */
+  resetReason?: string;
   freeHeap?: number;
   hostname?: string;
   /** ISO-8601 UTC of the last accepted NTP result, or null */

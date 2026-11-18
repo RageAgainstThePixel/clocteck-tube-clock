@@ -316,8 +316,16 @@ const char* ntpServer(int slot) {
 void applyTimeZone() { configTime(settings.tz, ntpServer(0), ntpServer(1), ntpServer(2)); }
 
 #ifndef HOST_MOCK
-// FW-TIME-011: resync every hour, stated here rather than left to the core's default.
-extern "C" uint32_t sntp_update_delay_MS_rfc_not_less_than_15000() { return TimeSync::kResyncMs; }
+// FW-TIME-011: resync at the top of each local hour. lwIP asks this right after an answer has set
+// the clock; with no believable time yet it falls back to an hour from now.
+extern "C" uint32_t sntp_update_delay_MS_rfc_not_less_than_15000() {
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  if (!isTimeKnown(tv.tv_sec, kBuildEpoch)) return TimeSync::kResyncMs;
+  struct tm t;
+  localtime_r(&tv.tv_sec, &t);
+  return msUntilTopOfHour(t.tm_min, t.tm_sec, static_cast<int>(tv.tv_usec / 1000));
+}
 
 // FW-TIME-015: runs (from the loop, via the core's scheduler) after SNTP has set the clock. A
 // rejected answer is undone and the RTC is left alone.
@@ -728,7 +736,12 @@ String stateJson() {
   }
   body += F(",\"rejectedSyncs\":");
   body += timeSync.rejectedSyncs();
-  body += '}';
+  // FW-API-038: whole seconds since boot, and why the chip last started (the core's own wording).
+  body += F(",\"uptimeS\":");
+  body += static_cast<uint32_t>(monoUs() / kUsPerSec);
+  body += F(",\"resetReason\":\"");
+  body += ESP.getResetReason();
+  body += F("\"}");
   return body;
 }
 
@@ -1409,7 +1422,7 @@ void onConnected() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.printf("\n[tubeclock] %s\n", kVersion);
+  Serial.printf("\n[tubeclock] %s, reset: %s\n", kVersion, ESP.getResetReason().c_str());
   loadSettings();
   setupEffects();
 #ifdef TUBECLOCK_HAS_LEDS

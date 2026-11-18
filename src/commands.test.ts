@@ -4,6 +4,7 @@ import {
   commandLabel,
   displayChange,
   effectBody,
+  formatUptime,
   parsePalette,
   parsePulse,
   percentToBrightness,
@@ -112,6 +113,17 @@ test('HOST-CLI-028 display flags', () => {
   assert.deepEqual(displayChange({ tubeBrightness: '1,2,3,4,5,6' }), { tubeBrightness: [1, 2, 3, 4, 5, 6] });
   assert.throws(() => displayChange({ seconds: 'maybe' }), RangeError);
   assert.throws(() => displayChange({ hours: '13' }), RangeError);
+});
+
+test('HOST-CLI-010 uptime shows the two largest units', () => {
+  assert.equal(formatUptime(0), '0 s');
+  assert.equal(formatUptime(12), '12 s');
+  assert.equal(formatUptime(125), '2 min 5 s');
+  assert.equal(formatUptime(7500), '2 h 5 min');
+  assert.equal(formatUptime(7200), '2 h');
+  assert.equal(formatUptime(3 * 86400 + 4 * 3600 + 59), '3 d 4 h');
+  assert.equal(formatUptime(86400 + 30), '1 d');
+  assert.equal(formatUptime(-5), '0 s');
 });
 
 test('HOST-CLI-019 timeSynced uses lastSync when reported, else a known time', () => {

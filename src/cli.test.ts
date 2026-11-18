@@ -96,6 +96,12 @@ test('HOST-CLI-010 status lists the saved tube colors only under the tubes patte
   assert.match(await clocteckStatus({}), /Tubes\n  1  #0400ff/);  // firmware from before effects
 });
 
+test('HOST-CLI-010 status shows uptime and the last reset reason when the firmware reports them', async () => {
+  assert.match(await clocteckStatus({ uptimeS: 7500, resetReason: 'Power On' }), /Uptime +2 h 5 min \(last reset: Power On\)/);
+  assert.match(await clocteckStatus({ uptimeS: 12 }), /Uptime +12 s\n/);
+  assert.doesNotMatch(await clocteckStatus({}), /Uptime/);
+});
+
 test('HOST-CLI-011 color all is one /api/tube request; value is ignored', async () => {
   const { code } = await run(['color', 'all', '200,50,10']);
   assert.equal(code, 0);

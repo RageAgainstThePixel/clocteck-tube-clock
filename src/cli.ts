@@ -9,6 +9,7 @@ import {
   commandLabel,
   displayChange,
   effectBody,
+  formatUptime,
   percentToBrightness,
   requiredFirmware,
   timeSynced,
@@ -343,6 +344,9 @@ function describeState(host: string, state: TubeClockState): string {
   ];
   if (state.effect) lines.push(`Effect     ${state.effect.pattern}${state.preset ? ` (preset ${state.preset})` : ''}`);
   if (state.timeSource) lines.push(`Source     ${state.timeSource}${state.lastSync ? `, last NTP sync ${state.lastSync}` : ''}`);
+  if (typeof state.uptimeS === 'number') {
+    lines.push(`Uptime     ${formatUptime(state.uptimeS)}${state.resetReason ? ` (last reset: ${state.resetReason})` : ''}`);
+  }
   // HOST-CLI-010: the saved per-tube colors are only what the clock shows under the `tubes` pattern
   // (or on firmware from before effects); otherwise they would read as the current colors.
   if (state.effect && state.effect.pattern !== 'tubes') return lines.join('\n');

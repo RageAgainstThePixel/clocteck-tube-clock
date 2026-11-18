@@ -87,6 +87,16 @@ uint32_t TimeSync::retryDelayMs() const {
   return delay < kResyncMs ? delay : kResyncMs;
 }
 
+uint32_t msUntilTopOfHour(int minute, int second, int ms) {
+  const auto clamp = [](int v, int hi) { return v < 0 ? 0 : v > hi ? hi : v; };
+  // Seconds up to 60, for a leap second.
+  const uint32_t into = static_cast<uint32_t>(clamp(minute, 59)) * 60000 + static_cast<uint32_t>(clamp(second, 60)) * 1000 +
+                        static_cast<uint32_t>(clamp(ms, 999));
+  const uint32_t hour = 3600000;
+  const uint32_t left = into >= hour ? 0 : hour - into;
+  return left < kTopOfHourMarginMs ? left + hour : left;
+}
+
 int answeringServer(const uint8_t* before, const uint8_t* after, int count, int lastIdx) {
   int replied = -1, changed = -1, replies = 0, changes = 0;
   for (int i = 0; i < count; i++) {

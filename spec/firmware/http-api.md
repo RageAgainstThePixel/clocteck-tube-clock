@@ -36,7 +36,9 @@ Plain HTTP on port 80. All responses except `/health` are `application/json`. Qu
             { "h": 241, "s": 100 }, { "h": 241, "s": 100 }, { "h": 241, "s": 100 }],
   "timeSource": "ntp",
   "lastSync": "2026-11-03T17:04:12Z",
-  "rejectedSyncs": 0
+  "rejectedSyncs": 0,
+  "uptimeS": 7512,
+  "resetReason": "Power On"
 }
 ```
 
@@ -49,7 +51,7 @@ Plain HTTP on port 80. All responses except `/health` are `application/json`. Qu
 | FW-API-035 | `attention` | `true` while a flash is showing. | Done |
 | FW-API-036 | `tubes` | Exactly 6 entries (the clock has six tubes, OQ-19), index 0 = leftmost tube as seen from the front. `h` 0–360, `s` 0–100. Value is always 100; brightness is global. | Done |
 | FW-API-037 | `timeSource` | `"ntp"`, `"rtc"` or `"none"`: where the current time came from (FW-TIME-006). | Done (`TimeSync::source`, host-tested; API test). The default build sets the RTC's pins, but only the host test has been seen to reach `"rtc"` (checklist 10). |
-| FW-API-038 | `ip`, `rssi`, `uptimeS`, `freeHeap` | Diagnostics. `rssi` in dBm. | Planned |
+| FW-API-038 | `uptimeS`, `resetReason`, `ip`, `rssi`, `freeHeap` | Diagnostics. `uptimeS` is whole seconds since boot (from `micros64()`, so it does not wrap at 49 days). `resetReason` is why the chip last started, in the ESP8266 core's own words (`ESP.getResetReason()`): `Power On`, `Hardware Watchdog`, `Exception`, `Software Watchdog`, `Software/System restart` (OTA, `/api/restart`), `Deep-Sleep Wake` or `External System`; the boot log line carries it too. `rssi` in dBm. | Partial: `uptimeS` and `resetReason` done (API test checks their form; the emulator always says `Power on`). `ip`, `rssi` and `freeHeap` planned. |
 | FW-API-039 | `hostname` | The compiled-in hostname (`tubeclock`). | Done (`mcp-test.mjs` needs it to send a valid `Host` to the emulator, since VER-005 keeps it from reading `FW_HOSTNAME`) |
 | FW-API-041 | `preset`, `effect`, `display` | Per FW-FX-069: `preset` name or `null`, `effect.pattern`, and the display options summary. `tubes` always holds the saved per-tube colors (the `tubes` pattern's palette), not what the effect is showing now. | Done |
 | FW-API-040 | `lastSync`, `rejectedSyncs` | Time-sync health (FW-TIME-016): `lastSync` is `"YYYY-MM-DDTHH:MM:SSZ"` or `null`, `rejectedSyncs` an integer. | Done |

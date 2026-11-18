@@ -453,6 +453,17 @@ static void testTimeSync() {
   for (int i = 0; i < 20; i++) d.onAnswer(0, 0);
   CHECK(d.retryDelayMs() == TimeSync::kResyncMs);
 
+  // FW-TIME-011: the next resync is at the top of the hour, skipping one under a minute away.
+  CHECK(msUntilTopOfHour(0, 0, 0) == 3600000);
+  CHECK(msUntilTopOfHour(0, 0, 50) == 3599950);    // a sync that landed just after the hour
+  CHECK(msUntilTopOfHour(42, 51, 0) == 1029000);   // 09:42:51 -> 10:00:00
+  CHECK(msUntilTopOfHour(58, 59, 999) == 60001);   // just over the margin: this hour
+  CHECK(msUntilTopOfHour(59, 0, 1) == 3659999);    // just under: the next one
+  CHECK(msUntilTopOfHour(59, 59, 900) == 3600100);
+  CHECK(msUntilTopOfHour(59, 60, 500) == 3600000);  // leap second
+  CHECK(msUntilTopOfHour(-1, 99, 5000) == 3539001);  // clamped to 00:60.999
+  for (int m = 0; m < 60; m += 7) CHECK(msUntilTopOfHour(m, 30, 0) >= kTopOfHourMarginMs);
+
   // FW-TIME-006, FW-API-037 where the time came from; a rejected answer changes nothing
   TimeSync e(buildSec);
   e.begin(0, 0, nullptr);
@@ -2150,7 +2161,8 @@ static void testMcpTools() {
       "\"preset\":\"a preset name of 24 char\",\"effect\":{\"pattern\":\"gradient\"},"
       "\"display\":{\"hours\":12,\"leadingZero\":false,\"seconds\":false,\"transition\":\"crossfade\"},\"attention\":true,"
       "\"tubes\":[{\"h\":360,\"s\":100},{\"h\":360,\"s\":100},{\"h\":360,\"s\":100},{\"h\":360,\"s\":100},{\"h\":360,\"s\":100},"
-      "{\"h\":360,\"s\":100}],\"lastSync\":\"2026-11-03T17:04:12Z\",\"rejectedSyncs\":4294967295,\"e\":[],\"f\":{},"
+      "{\"h\":360,\"s\":100}],\"lastSync\":\"2026-11-03T17:04:12Z\",\"rejectedSyncs\":4294967295,"
+      "\"uptimeS\":4294967295,\"resetReason\":\"Software/System restart\",\"e\":[],\"f\":{},"
       "\"esc\":\"a\\\"b:,{[\\\\\"}";
   d.state = big.c_str();
   r = mcp(d, toolCall("clock_status", nullptr));

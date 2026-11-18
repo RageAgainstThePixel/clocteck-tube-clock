@@ -108,6 +108,14 @@ class TimeSync {
   uint32_t rejectsInRow_ = 0;
 };
 
+/// FW-TIME-011: a sync closer than this to the top of the hour waits for the next one instead.
+constexpr uint32_t kTopOfHourMarginMs = 60000;
+
+/// FW-TIME-011: milliseconds from local time mm:ss.ms to the next top of the hour (hh:00:00), or
+/// to the one after when that is under kTopOfHourMarginMs away, so a sync that lands just before
+/// the hour does not ask again moments later. Out-of-range fields are clamped.
+uint32_t msUntilTopOfHour(int minute, int second, int ms);
+
 /// Picks which server answered, for the log line, from lwIP's per-server reachability registers
 /// (shifted left on each request, bit 0 set on a reply) read before and after the answer. lwIP does
 /// not expose its current server; the register that changed and has bit 0 set is the best guess,

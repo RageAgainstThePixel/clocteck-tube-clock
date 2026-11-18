@@ -110,6 +110,12 @@ check(
   (before.lastSync === null || /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(before.lastSync)) && Number.isInteger(before.rejectedSyncs),
   JSON.stringify({ lastSync: before.lastSync, rejectedSyncs: before.rejectedSyncs }),
 );
+// FW-API-038
+check(
+  'FW-API-038 state has uptimeS and resetReason',
+  Number.isInteger(before.uptimeS) && before.uptimeS >= 0 && typeof before.resetReason === 'string' && before.resetReason.length > 0,
+  JSON.stringify({ uptimeS: before.uptimeS, resetReason: before.resetReason }),
+);
 // FW-API-037, FW-TIME-006: the emulator has no NTP and no RTC, whatever its host's clock says.
 check('FW-API-037 FW-TIME-004 state says where the time came from', local ? before.timeSource === 'none' : ['ntp', 'rtc', 'none'].includes(before.timeSource), before.timeSource);
 check('FW-API-039 state names the hostname', typeof before.hostname === 'string' && before.hostname.length > 0, before.hostname);
@@ -593,7 +599,9 @@ await sleep(1000);
 if (local) {
   // The emulator exits on a restart, so start it again, without rebuilding: its files are all that carry over.
   const [cmd, args] = inWsl('env', 'EMULATE_SKIP_BUILD=1', 'sh', 'firmware/scripts/emulate.sh');
-  spawn(cmd, args, { cwd: repo, stdio: 'ignore', detached: true }).unref();
+  // On Windows `detached` gives the child its own console window, which pops up even with
+  // windowsHide; a plain child already outlives this script there.
+  spawn(cmd, args, { cwd: repo, stdio: 'ignore', detached: process.platform !== 'win32', windowsHide: true }).unref();
 }
 if (await backUp(60)) {
   r = await req('GET', '/api/effect');

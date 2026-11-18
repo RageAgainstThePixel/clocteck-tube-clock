@@ -40,7 +40,7 @@ Anyone with the board in hand can still read the Wi-Fi password out of flash; th
 | Route | Args | |
 |---|---|---|
 | `GET /health` | | `ok`, no auth |
-| `GET /api/state` | | version, hostname, time, tz, is24h, brightness, preset, effect, display, attention, tubes, timeSource, lastSync, rejectedSyncs |
+| `GET /api/state` | | version, hostname, time, tz, is24h, brightness, preset, effect, display, attention, tubes, timeSource, lastSync, rejectedSyncs, uptimeS, resetReason |
 | `POST /api/tube` | `t=1-6\|all`, `h=0-360`, `s=0-100` | saved; the active effect becomes `tubes` |
 | `POST /api/brightness` | `v=0-255` | saved |
 | `POST /api/hours` | `format=12\|24` | saved |

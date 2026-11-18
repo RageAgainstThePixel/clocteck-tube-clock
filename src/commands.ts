@@ -222,6 +222,24 @@ export function displayChange(flags: DisplayFlags): DisplayChange {
   return change;
 }
 
+/** Uptime for `status` (HOST-CLI-010): the two largest units, e.g. `3 d 4 h`, `2 h 5 min`, `12 s`. */
+export function formatUptime(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const parts: [number, string][] = [
+    [Math.floor(s / 86400), 'd'],
+    [Math.floor(s / 3600) % 24, 'h'],
+    [Math.floor(s / 60) % 60, 'min'],
+    [s % 60, 's'],
+  ];
+  const first = parts.findIndex(([n]) => n > 0);
+  if (first < 0) return '0 s';
+  return parts
+    .slice(first, first + 2)
+    .filter(([n]) => n > 0)
+    .map(([n, unit]) => `${n} ${unit}`)
+    .join(' ');
+}
+
 /** Whether the new firmware has the time from NTP (HOST-CLI-019): `lastSync` when reported, else a known time. */
 export function timeSynced(state: TubeClockState): boolean {
   if (state.lastSync !== undefined) return state.lastSync !== null;

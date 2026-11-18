@@ -18,7 +18,7 @@ One binary for both firmwares. The command set depends on which firmware answers
 
 | ID | Command | Stock 2110 | New firmware | Status |
 |---|---|---|---|---|
-| HOST-CLI-010 | `status` | `/config`, `/version`, `/wificonf` (ssid, ip only) | `/api/state`; the saved per-tube colors are listed only when the `tubes` pattern is active (or the firmware reports no effect), since otherwise the clock isn't showing them | Done |
+| HOST-CLI-010 | `status` | `/config`, `/version`, `/wificonf` (ssid, ip only) | `/api/state`; the saved per-tube colors are listed only when the `tubes` pattern is active (or the firmware reports no effect), since otherwise the clock isn't showing them. An `Uptime` line (two largest units, e.g. `2 h 5 min`, with `last reset: <reason>`) appears when the firmware reports `uptimeS` (FW-API-038) | Done |
 | HOST-CLI-011 | `color <1-6\|all> <color>` | `/tubecolor` per tube, `v` from the color | `/api/tube` once (`all` is native); `v` ignored | Done |
 | HOST-CLI-012 | `brightness <0-100>` | `/tubecolor` on tube 1 with `v` | `/api/brightness` with `v*2.55` rounded | Done |
 | HOST-CLI-013 | `mode <custom\|rainbow\|breathing\|flow>` | `/mode` | unsupported; the hint names `preset use` / `effect set` (HOST-CLI-026/027) | Done |
